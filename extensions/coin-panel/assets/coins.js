@@ -1,6 +1,6 @@
 /* Collector Coins floating panel. Talks to the app through the Shopify app proxy at /apps/coins. */
 (function () {
-  var root = document.getElementById("cc-root");
+  var root = document.getElementById("ccp-root");
   if (!root || root.dataset.ready) return;
   root.dataset.ready = "1";
 
@@ -22,27 +22,27 @@
   }
   function n(x) { return Number(x || 0).toLocaleString("en-US"); }
   function money(cents) { var v = cents / 100; return "$" + (v % 1 === 0 ? v : v.toFixed(2)); }
-  function coin(x) { return '<span class="cc-cost"><img src="' + esc(COIN) + '" alt="" width="16" height="16">' + n(x) + "</span>"; }
+  function coin(x) { return '<span class="ccp-cost"><img src="' + esc(COIN) + '" alt="" width="16" height="16">' + n(x) + "</span>"; }
   function date(d) { return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
 
   // ---- shell ----
   root.innerHTML =
-    '<div class="cc-panel" role="dialog" aria-label="Collector Coins"><div class="cc-head"></div><div class="cc-tabs"></div><div class="cc-body"></div></div>' +
-    '<button type="button" class="cc-launcher" aria-label="Open Collector Coins"><img src="' + esc(COIN) + '" alt=""><span>' + esc(cfg.label || "Collector Coins") + '</span><span class="cc-launcher-bal" hidden></span></button>';
-  if (cfg.hideLauncher === "true") root.classList.add("cc-no-launcher");
-  var $head = root.querySelector(".cc-head");
-  var $tabs = root.querySelector(".cc-tabs");
-  var $body = root.querySelector(".cc-body");
-  var $bal = root.querySelector(".cc-launcher-bal");
+    '<div class="ccp-panel" role="dialog" aria-label="Collector Coins"><div class="ccp-head"></div><div class="ccp-tabs"></div><div class="ccp-body"></div></div>' +
+    '<button type="button" class="ccp-launcher" aria-label="Open Collector Coins"><img src="' + esc(COIN) + '" alt=""><span>' + esc(cfg.label || "Collector Coins") + '</span><span class="ccp-launcher-bal" hidden></span></button>';
+  if (cfg.hideLauncher === "true") root.classList.add("ccp-no-launcher");
+  var $head = root.querySelector(".ccp-head");
+  var $tabs = root.querySelector(".ccp-tabs");
+  var $body = root.querySelector(".ccp-body");
+  var $bal = root.querySelector(".ccp-launcher-bal");
 
-  root.querySelector(".cc-launcher").addEventListener("click", function () { root.classList.contains("cc-open") ? close() : open("home"); });
+  root.querySelector(".ccp-launcher").addEventListener("click", function () { root.classList.contains("ccp-open") ? close() : open("home"); });
 
   function open(v) {
     view = v || "home";
-    root.classList.add("cc-open");
+    root.classList.add("ccp-open");
     if (!state) load(); else render();
   }
-  function close() { root.classList.remove("cc-open"); }
+  function close() { root.classList.remove("ccp-open"); }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
 
   // ---- data ----
@@ -61,47 +61,47 @@
   function load() {
     $head.innerHTML = "<h2>Collector Coins</h2><p>Loading&hellip;</p>";
     $tabs.innerHTML = "";
-    $body.innerHTML = '<p class="cc-empty">Loading your coins&hellip;</p>';
+    $body.innerHTML = '<p class="ccp-empty">Loading your coins&hellip;</p>';
     api("/me").then(function (s) { state = s; updateLauncher(); render(); }).catch(function (e) {
       if (e.message === "hidden") return;
-      $body.innerHTML = '<div class="cc-err">' + esc(e.message) + "</div>";
+      $body.innerHTML = '<div class="ccp-err">' + esc(e.message) + "</div>";
     });
   }
   function updateLauncher() {
     if (state && state.member) { $bal.hidden = false; $bal.textContent = n(state.member.balance); }
   }
-  if (signedIn) api("/me").then(function (s) { state = s; updateLauncher(); if (root.classList.contains("cc-open")) render(); }).catch(function () {});
+  if (signedIn) api("/me").then(function (s) { state = s; updateLauncher(); if (root.classList.contains("ccp-open")) render(); }).catch(function () {});
 
   // ---- render ----
   function render() {
     if (!state) return;
     var m = state.member;
     if (!m) {
-      $head.innerHTML = '<button class="cc-close" aria-label="Close">&times;</button><h2>Collector Coins</h2><p>Earn coins every time you shop, then trade them for free cards and discounts.</p>';
+      $head.innerHTML = '<button class="ccp-close" aria-label="Close">&times;</button><h2>Collector Coins</h2><p>Earn coins every time you shop, then trade them for free cards and discounts.</p>';
       $tabs.innerHTML = "";
       $body.innerHTML = signedOut();
     } else {
       var next = m.next;
       var pct = next ? Math.min(100, Math.round((100 * (m.lifetimeEarned - tierThreshold(m.tier))) / (next.threshold - tierThreshold(m.tier)))) : 100;
       $head.innerHTML =
-        '<button class="cc-close" aria-label="Close">&times;</button>' +
+        '<button class="ccp-close" aria-label="Close">&times;</button>' +
         "<h2>" + (m.firstName ? "Hi " + esc(m.firstName) : "Collector Coins") + "</h2>" +
-        '<div class="cc-bal"><img src="' + esc(COIN) + '" alt=""><div><strong>' + n(m.balance) + "</strong><br><span>Collector Coins</span></div></div>" +
-        '<div class="cc-tierline">' + tierIcon(m.tier, false) + "<div><b>" + esc(m.tierName) + "</b> &middot; " + m.earnRate + " coins per $1<br><span>" +
+        '<div class="ccp-bal"><img src="' + esc(COIN) + '" alt=""><div><strong>' + n(m.balance) + "</strong><br><span>Collector Coins</span></div></div>" +
+        '<div class="ccp-tierline">' + tierIcon(m.tier, false) + "<div><b>" + esc(m.tierName) + "</b> &middot; " + m.earnRate + " coins per $1<br><span>" +
         (next ? n(next.coinsToGo) + " coins to " + esc(next.name) : "Top tier reached") + "</span></div></div>" +
-        '<div class="cc-bar"><i style="width:' + pct + '%"></i></div>';
+        '<div class="ccp-bar"><i style="width:' + pct + '%"></i></div>';
       var tabs = [["home", "Earn"], ["rewards", "Redeem"], ["codes", "My codes"], ["activity", "History"]];
       $tabs.innerHTML = tabs.map(function (t) {
-        return '<button type="button" data-view="' + t[0] + '" class="' + (view === t[0] ? "cc-on" : "") + '">' + t[1] + "</button>";
+        return '<button type="button" data-view="' + t[0] + '" class="' + (view === t[0] ? "ccp-on" : "") + '">' + t[1] + "</button>";
       }).join("");
-      var html = flash ? '<div class="' + (flash.type === "ok" ? "cc-ok" : "cc-err") + '">' + flash.html + "</div>" : "";
+      var html = flash ? '<div class="' + (flash.type === "ok" ? "ccp-ok" : "ccp-err") + '">' + flash.html + "</div>" : "";
       if (view === "rewards") html += rewardsView(m);
       else if (view === "codes") html += codesView(m);
       else if (view === "activity") html += activityView(m);
       else html += homeView(m);
       $body.innerHTML = html;
     }
-    var c = $head.querySelector(".cc-close");
+    var c = $head.querySelector(".ccp-close");
     if (c) c.addEventListener("click", close);
   }
 
@@ -117,101 +117,101 @@
     birthday: '<rect x="4" y="10" width="16" height="10" rx="1"/><path d="M4 14h16M12 10v10M12 10c-2-3-5-3-5-1s3 1 5 1zm0 0c2-3 5-3 5-1s-3 1-5 1z"/>',
   };
   function icon(key) {
-    return '<span class="cc-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">' + (ICONS[key] || ICONS.purchase) + "</svg></span>";
+    return '<span class="ccp-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">' + (ICONS[key] || ICONS.purchase) + "</svg></span>";
   }
-  function h(title) { return '<h3 class="cc-h"><span>' + esc(title) + "</span></h3>"; }
+  function h(title) { return '<h3 class="ccp-h"><span>' + esc(title) + "</span></h3>"; }
 
   // Tier icon: the image chosen in the theme editor (App embeds > Collector Coins panel > Tier icons), else a lettered badge.
   function tierIcon(key, big) {
     var url = cfg["icon" + key.charAt(0).toUpperCase() + key.slice(1)];
-    var cls = "cc-ticon" + (big ? " cc-ticon-lg" : "");
+    var cls = "ccp-ticon" + (big ? " ccp-ticon-lg" : "");
     if (url) return '<img class="' + cls + '" src="' + esc(url) + '" alt="">';
-    return '<span class="' + cls + " cc-tb-" + esc(key) + '" aria-hidden="true">' + esc(key.charAt(0).toUpperCase()) + "</span>";
+    return '<span class="' + cls + " ccp-tb-" + esc(key) + '" aria-hidden="true">' + esc(key.charAt(0).toUpperCase()) + "</span>";
   }
 
   function signedOut() {
     var p = state.program;
     return (
-      '<div class="cc-join"><div class="cc-join-t">Join free, get $5 off</div><div class="cc-d">Your welcome code works on any order of $20 or more.</div>' +
-      '<div class="cc-row" style="margin-top:12px"><a class="cc-btn cc-btn-red cc-btn-block" href="' + esc(cfg.registerUrl) + '">Join free</a>' +
-      '<a class="cc-btn cc-btn-dark cc-btn-block" href="' + esc(cfg.loginUrl) + '">Sign in</a></div></div>' +
+      '<div class="ccp-join"><div class="ccp-join-t">Join free, get $5 off</div><div class="ccp-d">Your welcome code works on any order of $20 or more.</div>' +
+      '<div class="ccp-row" style="margin-top:12px"><a class="ccp-btn ccp-btn-red ccp-btn-block" href="' + esc(cfg.registerUrl) + '">Join free</a>' +
+      '<a class="ccp-btn ccp-btn-dark ccp-btn-block" href="' + esc(cfg.loginUrl) + '">Sign in</a></div></div>' +
       h("Ways to earn") + earnList(p) +
       h("Tiers") + tierGrid(p, null) +
       (state.prizes.length ? h("Prizes right now") + state.prizes.slice(0, 6).map(function (z) { return prizeCard(z, null); }).join("") : "") +
-      (cfg.landingUrl ? '<p class="cc-more"><a href="' + esc(cfg.landingUrl) + '">How Collector Coins works &rarr;</a></p>' : "")
+      (cfg.landingUrl ? '<p class="ccp-more"><a href="' + esc(cfg.landingUrl) + '">How Collector Coins works &rarr;</a></p>' : "")
     );
   }
 
   function earnList(p) {
     return p.waysToEarn.map(function (w) {
       var link = w.url ? ' <a href="' + esc(w.url) + '" target="_blank" rel="noopener">Write a review</a>' : "";
-      return '<div class="cc-card cc-earn">' + icon(w.key) + '<div class="cc-grow"><div class="cc-t">' + esc(w.title) + '</div><div class="cc-d">' + esc(w.detail) + link + "</div></div>" +
-        (w.badge ? '<span class="cc-pill">' + esc(w.badge) + "</span>" : "") + "</div>";
+      return '<div class="ccp-card ccp-earn">' + icon(w.key) + '<div class="ccp-grow"><div class="ccp-t">' + esc(w.title) + '</div><div class="ccp-d">' + esc(w.detail) + link + "</div></div>" +
+        (w.badge ? '<span class="ccp-pill">' + esc(w.badge) + "</span>" : "") + "</div>";
     }).join("");
   }
 
   function tierGrid(p, current) {
-    return '<div class="cc-tiers">' + p.tiers.map(function (t) {
+    return '<div class="ccp-tiers">' + p.tiers.map(function (t) {
       var here = t.key === current;
-      return '<div class="cc-tier' + (here ? " cc-here" : "") + '">' + (here ? '<span class="cc-you">Your tier</span>' : "") +
+      return '<div class="ccp-tier' + (here ? " ccp-here" : "") + '">' + (here ? '<span class="ccp-you">Your tier</span>' : "") +
         tierIcon(t.key, true) + '<b>' + esc(t.name) + "</b>" +
-        '<span class="cc-tier-need">' + (t.threshold ? n(t.threshold) + " coins earned" : "Join free") + "</span>" +
-        '<span class="cc-tier-rate">' + t.earnRate + "<small> coins / $1</small></span>" +
-        '<span class="cc-tier-reward">' + esc(t.reward) + "</span></div>";
-    }).join("") + '</div><p class="cc-note">Once you reach a tier, you keep it.</p>';
+        '<span class="ccp-tier-need">' + (t.threshold ? n(t.threshold) + " coins earned" : "Join free") + "</span>" +
+        '<span class="ccp-tier-rate">' + t.earnRate + "<small> coins / $1</small></span>" +
+        '<span class="ccp-tier-reward">' + esc(t.reward) + "</span></div>";
+    }).join("") + '</div><p class="ccp-note">Once you reach a tier, you keep it.</p>';
   }
 
   function homeView(m) {
     var b = m.birthday
-      ? '<div class="cc-card cc-earn">' + icon("birthday") + '<div class="cc-grow"><div class="cc-t">Your birthday</div><div class="cc-d">Saved: ' + MONTHS[m.birthday.month - 1] + " " + m.birthday.day + "</div></div></div>"
-      : '<div class="cc-card cc-earn cc-earn-col"><div class="cc-earn-top">' + icon("birthday") + '<div class="cc-grow"><div class="cc-t">Add your birthday</div><div class="cc-d">Ultra and Master Tier members get birthday coins.</div></div></div>' +
-        '<div class="cc-bday"><select data-bday="month" aria-label="Month">' + MONTHS.map(function (x, i) { return '<option value="' + (i + 1) + '">' + x + "</option>"; }).join("") +
+      ? '<div class="ccp-card ccp-earn">' + icon("birthday") + '<div class="ccp-grow"><div class="ccp-t">Your birthday</div><div class="ccp-d">Saved: ' + MONTHS[m.birthday.month - 1] + " " + m.birthday.day + "</div></div></div>"
+      : '<div class="ccp-card ccp-earn ccp-earn-col"><div class="ccp-earn-top">' + icon("birthday") + '<div class="ccp-grow"><div class="ccp-t">Add your birthday</div><div class="ccp-d">Ultra and Master Tier members get birthday coins.</div></div></div>' +
+        '<div class="ccp-bday"><select data-bday="month" aria-label="Month">' + MONTHS.map(function (x, i) { return '<option value="' + (i + 1) + '">' + x + "</option>"; }).join("") +
         '</select><select data-bday="day" aria-label="Day">' + Array.from({ length: 31 }, function (_, i) { return '<option value="' + (i + 1) + '">' + (i + 1) + "</option>"; }).join("") +
-        '</select><button type="button" class="cc-btn" data-act="birthday">Save</button></div></div>';
+        '</select><button type="button" class="ccp-btn" data-act="birthday">Save</button></div></div>';
     return h("Ways to earn") + earnList(state.program) + b + h("Tiers") + tierGrid(state.program, m.tier);
   }
 
   function prizeCard(z, m) {
     var can = m && m.balance >= z.coins;
-    var btn = m ? '<button type="button" class="cc-btn' + (can ? "" : " cc-btn-ghost") + '" data-act="prize" data-id="' + esc(z.productId) + '"' + (can && !busy ? "" : " disabled") + ">" + (can ? "Redeem" : "Need " + n(z.coins - m.balance)) + "</button>" : "";
-    var img = z.image ? '<img src="' + esc(z.image + (z.image.indexOf("?") < 0 ? "?" : "&") + "width=160") + '" alt="" loading="lazy">' : '<span class="cc-noimg"></span>';
-    return '<div class="cc-card cc-prize">' + img +
-      '<div class="cc-grow"><a class="cc-t" href="' + esc(z.url) + '">Free ' + esc(z.title) + "</a>" + coin(z.coins) + "</div>" + btn + "</div>";
+    var btn = m ? '<button type="button" class="ccp-btn' + (can ? "" : " ccp-btn-ghost") + '" data-act="prize" data-id="' + esc(z.productId) + '"' + (can && !busy ? "" : " disabled") + ">" + (can ? "Redeem" : "Need " + n(z.coins - m.balance)) + "</button>" : "";
+    var img = z.image ? '<img src="' + esc(z.image + (z.image.indexOf("?") < 0 ? "?" : "&") + "width=160") + '" alt="" loading="lazy">' : '<span class="ccp-noimg"></span>';
+    return '<div class="ccp-card ccp-prize">' + img +
+      '<div class="ccp-grow"><a class="ccp-t" href="' + esc(z.url) + '">Free ' + esc(z.title) + "</a>" + coin(z.coins) + "</div>" + btn + "</div>";
   }
 
   function rewardsView(m) {
     var maxDollars = Math.floor(m.balance / state.program.coinsPerDollarOff);
     if (discountDollars > maxDollars) discountDollars = Math.max(1, maxDollars);
-    var disc = '<div class="cc-card cc-discount"><div class="cc-t">Order discount</div><div class="cc-d">' +
+    var disc = '<div class="ccp-card ccp-discount"><div class="ccp-t">Order discount</div><div class="ccp-d">' +
       n(state.program.coinsPerDollarOff) + " coins = $1 off any order</div>";
     if (maxDollars >= 1) {
-      disc += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span class="cc-amt" data-amt>$' + discountDollars + " off</span>" +
+      disc += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span class="ccp-amt" data-amt>$' + discountDollars + " off</span>" +
         '<span data-amt-coins>' + coin(discountDollars * state.program.coinsPerDollarOff) + "</span></div>" +
         '<input type="range" min="1" max="' + maxDollars + '" value="' + discountDollars + '" data-discount aria-label="Dollars off">' +
-        '<button type="button" class="cc-btn cc-btn-red cc-btn-block" data-act="discount"' + (busy ? " disabled" : "") + ">Get my code</button>";
+        '<button type="button" class="ccp-btn ccp-btn-red ccp-btn-block" data-act="discount"' + (busy ? " disabled" : "") + ">Get my code</button>";
     } else {
-      disc += '<p class="cc-note">You need ' + n(state.program.coinsPerDollarOff - m.balance) + " more coins for $1 off.</p>";
+      disc += '<p class="ccp-note">You need ' + n(state.program.coinsPerDollarOff - m.balance) + " more coins for $1 off.</p>";
     }
     disc += "</div>";
     var prizes = state.prizes.length
       ? state.prizes.map(function (z) { return prizeCard(z, m); }).join("")
-      : '<p class="cc-empty">No prizes in stock right now. Check back soon.</p>';
+      : '<p class="ccp-empty">No prizes in stock right now. Check back soon.</p>';
     return h("Discounts") + disc + h("Free prizes") + prizes;
   }
 
   function codesView(m) {
-    if (!m.rewards.length) return '<p class="cc-empty">No codes yet. Redeem coins to get one.</p>';
+    if (!m.rewards.length) return '<p class="ccp-empty">No codes yet. Redeem coins to get one.</p>';
     return h("My codes") + m.rewards.map(function (r) {
-      return '<div class="cc-card cc-codecard"><div class="cc-grow"><div class="cc-t">' + esc(r.title) + '</div><div style="margin:6px 0"><span class="cc-code">' + esc(r.code) +
-        '</span></div><div class="cc-d">' + date(r.createdAt) + (r.kind === "gift_card" ? " &middot; Gift card, enter at checkout" : " &middot; Enter at checkout") + "</div></div>" +
-        '<button type="button" class="cc-btn cc-btn-dark" data-act="copy" data-code="' + esc(r.code) + '">Copy</button></div>';
-    }).join("") + '<p class="cc-note">Each code works once and only on your account.</p>';
+      return '<div class="ccp-card ccp-codecard"><div class="ccp-grow"><div class="ccp-t">' + esc(r.title) + '</div><div style="margin:6px 0"><span class="ccp-code">' + esc(r.code) +
+        '</span></div><div class="ccp-d">' + date(r.createdAt) + (r.kind === "gift_card" ? " &middot; Gift card, enter at checkout" : " &middot; Enter at checkout") + "</div></div>" +
+        '<button type="button" class="ccp-btn ccp-btn-dark" data-act="copy" data-code="' + esc(r.code) + '">Copy</button></div>';
+    }).join("") + '<p class="ccp-note">Each code works once and only on your account.</p>';
   }
 
   function activityView(m) {
-    if (!m.activity.length) return '<p class="cc-empty">No activity yet.</p>';
-    return h("History") + '<div class="cc-card cc-list">' + m.activity.map(function (a) {
-      return '<div class="cc-act"><div>' + esc(a.description) + "<small>" + date(a.createdAt) + '</small></div><div class="' + (a.amount >= 0 ? "cc-plus" : "cc-minus") + '">' +
+    if (!m.activity.length) return '<p class="ccp-empty">No activity yet.</p>';
+    return h("History") + '<div class="ccp-card ccp-list">' + m.activity.map(function (a) {
+      return '<div class="ccp-act"><div>' + esc(a.description) + "<small>" + date(a.createdAt) + '</small></div><div class="' + (a.amount >= 0 ? "ccp-plus" : "ccp-minus") + '">' +
         (a.amount > 0 ? "+" : "") + n(a.amount) + "</div></div>";
     }).join("") + "</div>";
   }
@@ -262,7 +262,7 @@
     api("/redeem", body)
       .then(function (r) {
         state = r.state; updateLauncher(); view = "codes";
-        flash = { type: "ok", html: "<b>" + esc(r.reward.title) + '</b><br>Your code: <span class="cc-code">' + esc(r.reward.code) + "</span><br>Enter it at checkout. It's saved here under My codes." };
+        flash = { type: "ok", html: "<b>" + esc(r.reward.title) + '</b><br>Your code: <span class="ccp-code">' + esc(r.reward.code) + "</span><br>Enter it at checkout. It's saved here under My codes." };
       })
       .catch(function (err) { flash = { type: "err", html: esc(err.message) }; })
       .then(function () { busy = false; render(); $body.scrollTop = 0; });

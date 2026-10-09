@@ -9,8 +9,8 @@
 -%}
 {%- if show -%}
   <div
-    id="cc-root"
-    class="cc-root cc-pos-{{ block.settings.position }}"
+    id="ccp-root"
+    class="ccp-root ccp-pos-{{ block.settings.position }}"
     data-proxy="{{ routes.root_url | remove_last: "/" }}/apps/coins"
     data-signed-in="{% if customer %}true{% else %}false{% endif %}"
     data-first-name="{{ customer.first_name | escape }}"
