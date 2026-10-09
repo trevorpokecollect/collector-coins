@@ -1,10 +1,10 @@
 // Staff home: program status, member search and the newest members.
-import { Form, Link, useLoaderData } from "react-router";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { programMode, testerTag, earnSources } from "../coins/ledger.server";
 import { tierByKey, formatCoins } from "../coins/rules";
-import { judgemeWebhookUrl } from "../coins/events.server";
+import { judgemeWebhookUrl, connectJudgeme } from "../coins/events.server";
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
@@ -34,11 +34,26 @@ export const loader = async ({ request }) => {
     sources: earnSources().join(", "),
     judgeme: judgemeWebhookUrl(),
     klaviyo: Boolean(process.env.KLAVIYO_PRIVATE_KEY),
+    judgemeToken: Boolean(process.env.JUDGEME_API_TOKEN),
   };
 };
 
+export const action = async ({ request }) => {
+  await authenticate.admin(request);
+  const form = await request.formData();
+  if (form.get("intent") !== "judgeme") return null;
+  try {
+    await connectJudgeme();
+    return { ok: "Judge.me is connected. New product reviews now earn 100 coins." };
+  } catch (err) {
+    return { error: err.message };
+  }
+};
+
 export default function Members() {
-  const { q, members, count, outstanding, mode, testerTag, sources, judgeme, klaviyo } = useLoaderData();
+  const { q, members, count, outstanding, mode, testerTag, sources, judgeme, klaviyo, judgemeToken } = useLoaderData();
+  const result = useActionData();
+  const busy = useNavigation().state !== "idle";
   return (
     <s-page heading="Collector Coins">
       <s-section heading="Program">
@@ -56,9 +71,21 @@ export default function Members() {
             discounts) · Orders that earn: {sources}
           </s-paragraph>
           <s-paragraph>Klaviyo events: {klaviyo ? "on" : "off (add KLAVIYO_PRIVATE_KEY in Railway)"}</s-paragraph>
+          {result?.ok && <s-banner tone="success">{result.ok}</s-banner>}
+          {result?.error && <s-banner tone="critical">{result.error}</s-banner>}
+          <s-paragraph>
+            Judge.me reviews:{" "}
+            {judgemeToken ? "token added. Click Connect Judge.me once." : "add JUDGEME_API_TOKEN in Railway, then click Connect."}
+          </s-paragraph>
+          {judgemeToken && (
+            <Form method="post">
+              <input type="hidden" name="intent" value="judgeme" />
+              <s-button type="submit" loading={busy || undefined}>Connect Judge.me</s-button>
+            </Form>
+          )}
           {judgeme && (
             <s-paragraph>
-              Judge.me webhook URL (event: review created): <s-text type="strong">{judgeme}</s-text>
+              <s-text color="subdued">Webhook address: {judgeme}</s-text>
             </s-paragraph>
           )}
         </s-stack>

@@ -147,3 +147,23 @@ export function judgemeWebhookUrl() {
   const t = judgemeToken();
   return t ? `${process.env.SHOPIFY_APP_URL}/judgeme?token=${t}` : null;
 }
+
+/**
+ * Register our review/created webhook with Judge.me. Judge.me has no screen for webhooks, only an API,
+ * so this needs JUDGEME_API_TOKEN (Judge.me → Settings → Integrations → View API tokens → Private API token).
+ */
+export async function connectJudgeme() {
+  const token = process.env.JUDGEME_API_TOKEN;
+  const url = judgemeWebhookUrl();
+  if (!token) throw new Error("Add JUDGEME_API_TOKEN in Railway first.");
+  if (!url) throw new Error("The app secret is missing.");
+  const qs = new URLSearchParams({ api_token: token, shop_domain: process.env.SHOP || "poke-collect-al.myshopify.com" });
+  const res = await fetch(`https://judge.me/api/v1/webhooks?${qs}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ webhook: { key: "review/created", url } }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Judge.me said ${res.status}: ${text.slice(0, 300)}`);
+  return text;
+}
