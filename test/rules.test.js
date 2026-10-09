@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tierForLifetime, resolveTier, nextTier, toCents, purchaseCoins, refundCoins, prizeCoins,
-  discountDollarsForCoins, orderEarns, birthdayCoinsDue, isValidBirthday, makeCode, monthDayInZone,
+  discountDollarsForCoins, orderEarns, birthdayCoinsDue, isValidBirthday, makeCode, monthDayInZone, expiryDate, redemptionAlertThreshold,
 } from "../app/coins/rules.js";
 
 test("tiers by lifetime coins", () => {
@@ -74,4 +74,11 @@ test("birthdays", () => {
 
 test("codes", () => {
   assert.match(makeCode(), /^COINS-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+});
+
+test("expiry and alerts", () => {
+  assert.equal(expiryDate(new Date("2026-10-09T12:00:00Z")).toISOString().slice(0, 10), "2027-10-09");
+  assert.equal(expiryDate(new Date("2027-01-31T12:00:00Z"), 1).toISOString().slice(0, 10), "2027-02-28");
+  assert.equal(redemptionAlertThreshold(2000), 10000);
+  assert.equal(redemptionAlertThreshold(50000), 150000);
 });

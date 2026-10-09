@@ -81,7 +81,12 @@ export async function credit(member, { amount, kind, description, orderId, earnR
       });
       await tx.member.update({
         where: { id: member.id },
-        data: { balance: { increment: amount }, ...(countsToTier ? { lifetimeEarned: { increment: amount } } : {}) },
+        data: {
+          balance: { increment: amount },
+          ...(countsToTier ? { lifetimeEarned: { increment: amount } } : {}),
+          lastActivityAt: new Date(),
+          expiryWarnedAt: null,
+        },
       });
       return t;
     });
@@ -133,7 +138,7 @@ export async function spend(member, { amount, description, idemKey }) {
   return prisma.$transaction(async (tx) => {
     const res = await tx.member.updateMany({
       where: { id: member.id, balance: { gte: amount } },
-      data: { balance: { decrement: amount } },
+      data: { balance: { decrement: amount }, lastActivityAt: new Date(), expiryWarnedAt: null },
     });
     if (res.count !== 1) return null;
     return tx.transaction.create({

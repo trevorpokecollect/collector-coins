@@ -1,6 +1,6 @@
 // What the storefront coin panel shows, built for one (possibly signed-out) visitor.
 import prisma from "../db.server";
-import { TIERS, tierByKey, nextTier, REVIEW_COINS, GOOGLE_REVIEW_COINS, COINS_PER_DOLLAR_OFF } from "./rules";
+import { TIERS, tierByKey, nextTier, REVIEW_COINS, GOOGLE_REVIEW_COINS, COINS_PER_DOLLAR_OFF, EXPIRY_MONTHS, expiryDate } from "./rules";
 import { customerIncluded, findOrCreateMember } from "./ledger.server";
 import { adminClient, getCustomer, listPrizes } from "./shopify.server";
 
@@ -31,6 +31,7 @@ export async function memberForProxy(request) {
 export function programInfo() {
   return {
     coinsPerDollarOff: COINS_PER_DOLLAR_OFF,
+    expiryMonths: EXPIRY_MONTHS,
     tiers: TIERS.map((t) => ({
       key: t.key, name: t.name, threshold: t.threshold, earnRate: t.earnRate, birthdayCoins: t.birthdayCoins, reward: t.entry.title,
     })),
@@ -67,6 +68,7 @@ export async function panelState(member) {
     earnRate: tier.earnRate,
     next: nextTier(member.tier, member.lifetimeEarned),
     birthday: member.birthdayMonth ? { month: member.birthdayMonth, day: member.birthdayDay } : null,
+    expiresOn: member.balance > 0 ? expiryDate(member.lastActivityAt || new Date()).toISOString() : null,
     rewards: rewards.map((r) => ({ id: r.id, title: r.title, code: r.code, kind: r.kind, createdAt: r.createdAt })),
     activity: activity.map((t) => ({ description: t.description, amount: t.amount, createdAt: t.createdAt })),
   };

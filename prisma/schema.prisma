@@ -40,6 +40,8 @@ model Member {
   birthdayDay         Int?
   birthdayYearAwarded Int?
   importedFromSmile   Boolean       @default(false)
+  lastActivityAt      DateTime      @default(now()) // earning or redeeming; coins expire 12 months after this
+  expiryWarnedAt      DateTime?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   transactions        Transaction[]
@@ -47,6 +49,7 @@ model Member {
 
   @@index([email])
   @@index([birthdayMonth, birthdayDay])
+  @@index([lastActivityAt])
 }
 
 // The coin ledger: every coin earned or spent is one row. balance = sum(amount).
@@ -84,4 +87,5 @@ model Reward {
   createdAt  DateTime @default(now())
 
   @@index([memberId, createdAt])
+  @@index([createdAt])
 }

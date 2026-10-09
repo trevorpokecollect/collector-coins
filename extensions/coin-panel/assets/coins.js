@@ -196,7 +196,7 @@
     var prizes = state.prizes.length
       ? state.prizes.map(function (z) { return prizeCard(z, m); }).join("")
       : '<p class="ccp-empty">No prizes in stock right now. Check back soon.</p>';
-    return h("Discounts") + disc + h("Free prizes") + prizes;
+    return h("Discounts") + disc + h("Free prizes") + prizes + expiryNote(m);
   }
 
   function codesView(m) {
@@ -208,9 +208,14 @@
     }).join("") + '<p class="ccp-note">Each code works once and only on your account.</p>';
   }
 
+  function expiryNote(m) {
+    if (!m.expiresOn) return "";
+    return '<p class="ccp-note">Coins expire after ' + state.program.expiryMonths + " months with no orders or redemptions. Yours are good until " + date(m.expiresOn) + ".</p>";
+  }
+
   function activityView(m) {
-    if (!m.activity.length) return '<p class="ccp-empty">No activity yet.</p>';
-    return h("History") + '<div class="ccp-card ccp-list">' + m.activity.map(function (a) {
+    if (!m.activity.length) return '<p class="ccp-empty">No activity yet.</p>' + expiryNote(m);
+    return expiryNote(m) + h("History") + '<div class="ccp-card ccp-list">' + m.activity.map(function (a) {
       return '<div class="ccp-act"><div>' + esc(a.description) + "<small>" + date(a.createdAt) + '</small></div><div class="' + (a.amount >= 0 ? "ccp-plus" : "ccp-minus") + '">' +
         (a.amount > 0 ? "+" : "") + n(a.amount) + "</div></div>";
     }).join("") + "</div>";

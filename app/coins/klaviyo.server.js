@@ -7,6 +7,9 @@ export const METRICS = {
   tier: "Collector Coins Tier Reached",
   reward: "Collector Coins Reward Issued",
   adjusted: "Collector Coins Adjusted",
+  expiring: "Collector Coins Expiring Soon",
+  expired: "Collector Coins Expired",
+  alert: "Collector Coins Redemption Alert",
 };
 
 export async function sendEvent(metric, member, properties = {}) {

@@ -44,6 +44,22 @@ export const PRIZE_COINS_PER_DOLLAR = 200; // free product: retail price x 200 c
 export const PRIZE_MIN_STOCK = 20;
 export const PRIZE_TAG = "Collector Coins Prize";
 export const PRIZE_COLLECTION_HANDLE = "collector-coins-prizes";
+export const EXPIRY_MONTHS = 12; // coins expire after this long with no earning or redeeming
+export const EXPIRY_WARN_DAYS = 30; // warning email this many days before
+
+/** The date a balance expires, given the last activity. */
+export function expiryDate(lastActivityAt, months = EXPIRY_MONTHS) {
+  const d = new Date(lastActivityAt);
+  const day = d.getUTCDate();
+  d.setUTCMonth(d.getUTCMonth() + months);
+  if (d.getUTCDate() < day) d.setUTCDate(0); // Jan 31 + 1 month = Feb 28/29, not Mar 3
+  return d;
+}
+
+/** Spike check: today's redeemed dollars against a floor and 3x the recent daily average. */
+export function redemptionAlertThreshold(avgDailyCents, minCents = 10000) {
+  return Math.max(minCents, Math.round(avgDailyCents * 3));
+}
 
 export function tierByKey(key) {
   return TIERS.find((t) => t.key === key) || TIERS[0];

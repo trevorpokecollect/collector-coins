@@ -5,6 +5,8 @@ import prisma from "../db.server";
 import { programMode, testerTag, earnSources } from "../coins/ledger.server";
 import { tierByKey, formatCoins } from "../coins/rules";
 import { judgemeWebhookUrl, connectJudgeme } from "../coins/events.server";
+import { redemptionsByDay, checkRedemptionSpike, expiryStats } from "../coins/expiry.server";
+import { formatMoney, EXPIRY_MONTHS } from "../coins/rules";
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
@@ -19,10 +21,13 @@ export const loader = async ({ request }) => {
         ],
       }
     : {};
-  const [members, count, sums] = await Promise.all([
+  const [members, count, sums, days, spike, expiry] = await Promise.all([
     prisma.member.findMany({ where, orderBy: { updatedAt: "desc" }, take: 50 }),
     prisma.member.count(),
     prisma.member.aggregate({ _sum: { balance: true } }),
+    redemptionsByDay(14),
+    checkRedemptionSpike(),
+    expiryStats(),
   ]);
   return {
     q,
@@ -35,6 +40,10 @@ export const loader = async ({ request }) => {
     judgeme: judgemeWebhookUrl(),
     klaviyo: Boolean(process.env.KLAVIYO_PRIVATE_KEY),
     judgemeToken: Boolean(process.env.JUDGEME_API_TOKEN),
+    days,
+    spike,
+    expiry,
+    alertEmail: process.env.ALERT_EMAIL || null,
   };
 };
 
@@ -51,7 +60,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Members() {
-  const { q, members, count, outstanding, mode, testerTag, sources, judgeme, klaviyo, judgemeToken } = useLoaderData();
+  const { q, members, count, outstanding, mode, testerTag, sources, judgeme, klaviyo, judgemeToken, days, spike, expiry, alertEmail } = useLoaderData();
   const result = useActionData();
   const busy = useNavigation().state !== "idle";
   return (
@@ -89,6 +98,47 @@ export default function Members() {
             </s-paragraph>
           )}
         </s-stack>
+      </s-section>
+
+      <s-section heading="Redemptions">
+        {spike.spiking && (
+          <s-banner tone="critical">
+            Redemptions are unusually high today: {formatMoney(spike.today.valueCents)} so far, against a normal {formatMoney(spike.avgCents)} a day.
+          </s-banner>
+        )}
+        <s-paragraph>
+          Today: {spike.today.count} redemptions, {formatMoney(spike.today.valueCents)} ({formatCoins(spike.today.coins)} coins). Alert above{" "}
+          {formatMoney(spike.thresholdCents)} a day{alertEmail ? `, emailed to ${alertEmail} through Klaviyo` : " (add ALERT_EMAIL in Railway to get an email)"}.
+        </s-paragraph>
+        <s-table>
+          <s-table-header-row>
+            <s-table-header>Day</s-table-header>
+            <s-table-header format="numeric">Redemptions</s-table-header>
+            <s-table-header format="numeric">Discounts</s-table-header>
+            <s-table-header format="numeric">Prizes</s-table-header>
+            <s-table-header format="numeric">Coins</s-table-header>
+            <s-table-header format="numeric">Value</s-table-header>
+          </s-table-header-row>
+          <s-table-body>
+            {days.map((d) => (
+              <s-table-row key={d.day}>
+                <s-table-cell>{d.day}</s-table-cell>
+                <s-table-cell>{d.count}</s-table-cell>
+                <s-table-cell>{d.discounts}</s-table-cell>
+                <s-table-cell>{d.prizes}</s-table-cell>
+                <s-table-cell>{formatCoins(d.coins)}</s-table-cell>
+                <s-table-cell>{formatMoney(d.valueCents)}</s-table-cell>
+              </s-table-row>
+            ))}
+          </s-table-body>
+        </s-table>
+        <s-paragraph>
+          <s-text color="subdued">
+            Prize value is retail price; your real cost is what you paid for the product. Coins expire after {EXPIRY_MONTHS} months with no earning or
+            redeeming: {formatCoins(expiry.expiringMembers)} members ({formatCoins(expiry.expiringCoins)} coins) are within 30 days of expiring, and{" "}
+            {formatCoins(expiry.expiredLast30)} coins expired in the last 30 days.
+          </s-text>
+        </s-paragraph>
       </s-section>
 
       <s-section heading="Members">
