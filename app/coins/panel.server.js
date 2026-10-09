@@ -35,10 +35,10 @@ export function programInfo() {
       key: t.key, name: t.name, threshold: t.threshold, earnRate: t.earnRate, birthdayCoins: t.birthdayCoins, reward: t.entry.title,
     })),
     waysToEarn: [
-      { key: "purchase", title: "Shop with us", detail: "2 to 10 coins per $1, based on your tier" },
-      { key: "review", title: "Review a product", detail: `${REVIEW_COINS} coins per product review` },
-      { key: "google", title: "Google review", detail: `${GOOGLE_REVIEW_COINS} coins. Email your screenshot to support@poke-collect.com`, url: "https://g.page/r/CRGYfzYI9zxTEAE/review" },
-      { key: "birthday", title: "Birthday bonus", detail: "200 coins for Ultra Ball, 500 for Master Ball" },
+      { key: "purchase", title: "Shop with us", badge: "2-10 / $1", detail: "Coins on every online order. Higher tiers earn more per $1." },
+      { key: "review", title: "Review a product", badge: `+${REVIEW_COINS}`, detail: "For each product you review." },
+      { key: "google", title: "Google review", badge: `+${GOOGLE_REVIEW_COINS}`, detail: "Email your screenshot to support@poke-collect.com", url: "https://g.page/r/CRGYfzYI9zxTEAE/review" },
+      { key: "birthday", title: "Birthday bonus", badge: "+200-500", detail: "200 coins for Ultra Tier, 500 for Master Tier." },
     ],
   };
 }

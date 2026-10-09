@@ -21,6 +21,10 @@
     data-take-over="{{ block.settings.take_over_links }}"
     data-coin="https://poke-collect.com/cdn/shop/files/PokeCollect_Coins_b45f5078-ccb8-4277-87b5-7c38a10f9e0e.png?v=1723056762&width=120"
     data-hide-launcher="{{ block.settings.hide_launcher }}"
+    data-icon-poke="{% if block.settings.icon_poke %}{{ block.settings.icon_poke | image_url: width: 160 }}{% endif %}"
+    data-icon-great="{% if block.settings.icon_great %}{{ block.settings.icon_great | image_url: width: 160 }}{% endif %}"
+    data-icon-ultra="{% if block.settings.icon_ultra %}{{ block.settings.icon_ultra | image_url: width: 160 }}{% endif %}"
+    data-icon-master="{% if block.settings.icon_master %}{{ block.settings.icon_master | image_url: width: 160 }}{% endif %}"
   ></div>
 {%- endif -%}
 
@@ -62,7 +66,12 @@
       "info": "Links to #coins-home, #coins-rewards (and the old #smile- links) open this panel.",
       "default": true
     },
-    { "type": "text", "id": "landing_url", "label": "Collector Coins page", "default": "/pages/collector-coins" }
+    { "type": "text", "id": "landing_url", "label": "Collector Coins page", "default": "/pages/collector-coins" },
+    { "type": "header", "content": "Tier icons" },
+    { "type": "image_picker", "id": "icon_poke", "label": "Poke Tier icon" },
+    { "type": "image_picker", "id": "icon_great", "label": "Great Tier icon" },
+    { "type": "image_picker", "id": "icon_ultra", "label": "Ultra Tier icon" },
+    { "type": "image_picker", "id": "icon_master", "label": "Master Tier icon" }
   ]
 }
 {% endschema %}

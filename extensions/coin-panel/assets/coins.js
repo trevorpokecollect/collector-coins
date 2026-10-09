@@ -87,8 +87,8 @@
         '<button class="cc-close" aria-label="Close">&times;</button>' +
         "<h2>" + (m.firstName ? "Hi " + esc(m.firstName) : "Collector Coins") + "</h2>" +
         '<div class="cc-bal"><img src="' + esc(COIN) + '" alt=""><div><strong>' + n(m.balance) + "</strong><br><span>Collector Coins</span></div></div>" +
-        '<div class="cc-tierline"><b>' + esc(m.tierName) + "</b> &middot; " + m.earnRate + " coins per $1" +
-        (next ? " &middot; " + n(next.coinsToGo) + " to " + esc(next.name) : " &middot; Top tier") + "</div>" +
+        '<div class="cc-tierline">' + tierIcon(m.tier, false) + "<div><b>" + esc(m.tierName) + "</b> &middot; " + m.earnRate + " coins per $1<br><span>" +
+        (next ? n(next.coinsToGo) + " coins to " + esc(next.name) : "Top tier reached") + "</span></div></div>" +
         '<div class="cc-bar"><i style="width:' + pct + '%"></i></div>';
       var tabs = [["home", "Earn"], ["rewards", "Redeem"], ["codes", "My codes"], ["activity", "History"]];
       $tabs.innerHTML = tabs.map(function (t) {
@@ -110,56 +110,80 @@
     return t ? t.threshold : 0;
   }
 
+  var ICONS = {
+    purchase: '<path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+    review: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z"/>',
+    google: '<path d="M4 5h16v11H9l-5 4V5z"/><path d="M12 8l1 2 2 .3-1.5 1.4.4 2.1-1.9-1-1.9 1 .4-2.1L9 10.3l2-.3 1-2z"/>',
+    birthday: '<rect x="4" y="10" width="16" height="10" rx="1"/><path d="M4 14h16M12 10v10M12 10c-2-3-5-3-5-1s3 1 5 1zm0 0c2-3 5-3 5-1s-3 1-5 1z"/>',
+  };
+  function icon(key) {
+    return '<span class="cc-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">' + (ICONS[key] || ICONS.purchase) + "</svg></span>";
+  }
+  function h(title) { return '<h3 class="cc-h"><span>' + esc(title) + "</span></h3>"; }
+
+  // Tier icon: the image chosen in the theme editor (App embeds > Collector Coins panel > Tier icons), else a lettered badge.
+  function tierIcon(key, big) {
+    var url = cfg["icon" + key.charAt(0).toUpperCase() + key.slice(1)];
+    var cls = "cc-ticon" + (big ? " cc-ticon-lg" : "");
+    if (url) return '<img class="' + cls + '" src="' + esc(url) + '" alt="">';
+    return '<span class="' + cls + " cc-tb-" + esc(key) + '" aria-hidden="true">' + esc(key.charAt(0).toUpperCase()) + "</span>";
+  }
+
   function signedOut() {
     var p = state.program;
     return (
-      '<div class="cc-row"><a class="cc-btn cc-btn-red cc-btn-block" href="' + esc(cfg.registerUrl) + '">Join free</a>' +
-      '<a class="cc-btn cc-btn-dark cc-btn-block" href="' + esc(cfg.loginUrl) + '">Sign in</a></div>' +
-      '<p class="cc-note">Joining is free. You get $5 off your next $20+ order right away.</p>' +
-      "<h3>Ways to earn</h3>" + earnList(p) +
-      "<h3>Ball tiers</h3>" + tierGrid(p, null) +
-      "<h3>Prizes right now</h3>" +
-      state.prizes.slice(0, 6).map(function (z) { return prizeCard(z, null); }).join("") +
-      (cfg.landingUrl ? '<p class="cc-note"><a href="' + esc(cfg.landingUrl) + '">See how Collector Coins works &rarr;</a></p>' : "")
+      '<div class="cc-join"><div class="cc-join-t">Join free, get $5 off</div><div class="cc-d">Your welcome code works on any order of $20 or more.</div>' +
+      '<div class="cc-row" style="margin-top:12px"><a class="cc-btn cc-btn-red cc-btn-block" href="' + esc(cfg.registerUrl) + '">Join free</a>' +
+      '<a class="cc-btn cc-btn-dark cc-btn-block" href="' + esc(cfg.loginUrl) + '">Sign in</a></div></div>' +
+      h("Ways to earn") + earnList(p) +
+      h("Tiers") + tierGrid(p, null) +
+      (state.prizes.length ? h("Prizes right now") + state.prizes.slice(0, 6).map(function (z) { return prizeCard(z, null); }).join("") : "") +
+      (cfg.landingUrl ? '<p class="cc-more"><a href="' + esc(cfg.landingUrl) + '">How Collector Coins works &rarr;</a></p>' : "")
     );
   }
 
   function earnList(p) {
     return p.waysToEarn.map(function (w) {
       var link = w.url ? ' <a href="' + esc(w.url) + '" target="_blank" rel="noopener">Write a review</a>' : "";
-      return '<div class="cc-card"><div class="cc-grow"><div class="cc-t">' + esc(w.title) + '</div><div class="cc-d">' + esc(w.detail) + link + "</div></div></div>";
+      return '<div class="cc-card cc-earn">' + icon(w.key) + '<div class="cc-grow"><div class="cc-t">' + esc(w.title) + '</div><div class="cc-d">' + esc(w.detail) + link + "</div></div>" +
+        (w.badge ? '<span class="cc-pill">' + esc(w.badge) + "</span>" : "") + "</div>";
     }).join("");
   }
 
   function tierGrid(p, current) {
     return '<div class="cc-tiers">' + p.tiers.map(function (t) {
-      return '<div class="cc-tier' + (t.key === current ? " cc-here" : "") + '"><b>' + esc(t.name) + "</b><small>" +
-        (t.threshold ? "Earn " + n(t.threshold) + " coins" : "Join free") + "</small><small>" + t.earnRate + " coins per $1</small><small>Reward: " + esc(t.reward) + "</small></div>";
-    }).join("") + "</div><p class=\"cc-note\">Once you reach a tier, you keep it.</p>";
+      var here = t.key === current;
+      return '<div class="cc-tier' + (here ? " cc-here" : "") + '">' + (here ? '<span class="cc-you">Your tier</span>' : "") +
+        tierIcon(t.key, true) + '<b>' + esc(t.name) + "</b>" +
+        '<span class="cc-tier-need">' + (t.threshold ? n(t.threshold) + " coins earned" : "Join free") + "</span>" +
+        '<span class="cc-tier-rate">' + t.earnRate + "<small> coins / $1</small></span>" +
+        '<span class="cc-tier-reward">' + esc(t.reward) + "</span></div>";
+    }).join("") + '</div><p class="cc-note">Once you reach a tier, you keep it.</p>';
   }
 
   function homeView(m) {
     var b = m.birthday
-      ? '<div class="cc-card"><div class="cc-grow"><div class="cc-t">Birthday</div><div class="cc-d">Saved: ' + MONTHS[m.birthday.month - 1] + " " + m.birthday.day + "</div></div></div>"
-      : '<div class="cc-card"><div class="cc-grow"><div class="cc-t">Add your birthday</div><div class="cc-d">Ultra and Master Ball members get birthday coins.</div>' +
-        '<div class="cc-bday" style="margin-top:8px"><select data-bday="month">' + MONTHS.map(function (x, i) { return '<option value="' + (i + 1) + '">' + x + "</option>"; }).join("") +
-        '</select><select data-bday="day">' + Array.from({ length: 31 }, function (_, i) { return '<option value="' + (i + 1) + '">' + (i + 1) + "</option>"; }).join("") +
-        '</select><button type="button" class="cc-btn" data-act="birthday">Save</button></div></div></div>';
-    return "<h3>Ways to earn</h3>" + earnList(state.program) + b + "<h3>Ball tiers</h3>" + tierGrid(state.program, m.tier);
+      ? '<div class="cc-card cc-earn">' + icon("birthday") + '<div class="cc-grow"><div class="cc-t">Your birthday</div><div class="cc-d">Saved: ' + MONTHS[m.birthday.month - 1] + " " + m.birthday.day + "</div></div></div>"
+      : '<div class="cc-card cc-earn cc-earn-col"><div class="cc-earn-top">' + icon("birthday") + '<div class="cc-grow"><div class="cc-t">Add your birthday</div><div class="cc-d">Ultra and Master Tier members get birthday coins.</div></div></div>' +
+        '<div class="cc-bday"><select data-bday="month" aria-label="Month">' + MONTHS.map(function (x, i) { return '<option value="' + (i + 1) + '">' + x + "</option>"; }).join("") +
+        '</select><select data-bday="day" aria-label="Day">' + Array.from({ length: 31 }, function (_, i) { return '<option value="' + (i + 1) + '">' + (i + 1) + "</option>"; }).join("") +
+        '</select><button type="button" class="cc-btn" data-act="birthday">Save</button></div></div>';
+    return h("Ways to earn") + earnList(state.program) + b + h("Tiers") + tierGrid(state.program, m.tier);
   }
 
   function prizeCard(z, m) {
     var can = m && m.balance >= z.coins;
-    var btn = m ? '<button type="button" class="cc-btn" data-act="prize" data-id="' + esc(z.productId) + '"' + (can && !busy ? "" : " disabled") + ">" + (can ? "Redeem" : "Need " + n(z.coins - m.balance)) + "</button>" : "";
-    return '<div class="cc-card">' + (z.image ? '<img src="' + esc(z.image + (z.image.indexOf("?") < 0 ? "?" : "&") + "width=120") + '" alt="" loading="lazy">' : "") +
-      '<div class="cc-grow"><div class="cc-t"><a href="' + esc(z.url) + '" style="color:inherit">Free ' + esc(z.title) + "</a></div>" + coin(z.coins) + "</div>" + btn + "</div>";
+    var btn = m ? '<button type="button" class="cc-btn' + (can ? "" : " cc-btn-ghost") + '" data-act="prize" data-id="' + esc(z.productId) + '"' + (can && !busy ? "" : " disabled") + ">" + (can ? "Redeem" : "Need " + n(z.coins - m.balance)) + "</button>" : "";
+    var img = z.image ? '<img src="' + esc(z.image + (z.image.indexOf("?") < 0 ? "?" : "&") + "width=160") + '" alt="" loading="lazy">' : '<span class="cc-noimg"></span>';
+    return '<div class="cc-card cc-prize">' + img +
+      '<div class="cc-grow"><a class="cc-t" href="' + esc(z.url) + '">Free ' + esc(z.title) + "</a>" + coin(z.coins) + "</div>" + btn + "</div>";
   }
 
   function rewardsView(m) {
     var maxDollars = Math.floor(m.balance / state.program.coinsPerDollarOff);
     if (discountDollars > maxDollars) discountDollars = Math.max(1, maxDollars);
-    var disc = '<div class="cc-discount"><div class="cc-t" style="font-weight:700">Order discount</div><div class="cc-d" style="color:#5f5f5f">' +
-      n(state.program.coinsPerDollarOff) + " coins = $1 off</div>";
+    var disc = '<div class="cc-card cc-discount"><div class="cc-t">Order discount</div><div class="cc-d">' +
+      n(state.program.coinsPerDollarOff) + " coins = $1 off any order</div>";
     if (maxDollars >= 1) {
       disc += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span class="cc-amt" data-amt>$' + discountDollars + " off</span>" +
         '<span data-amt-coins>' + coin(discountDollars * state.program.coinsPerDollarOff) + "</span></div>" +
@@ -172,13 +196,13 @@
     var prizes = state.prizes.length
       ? state.prizes.map(function (z) { return prizeCard(z, m); }).join("")
       : '<p class="cc-empty">No prizes in stock right now. Check back soon.</p>';
-    return "<h3>Discounts</h3>" + disc + "<h3>Free prizes</h3>" + prizes;
+    return h("Discounts") + disc + h("Free prizes") + prizes;
   }
 
   function codesView(m) {
     if (!m.rewards.length) return '<p class="cc-empty">No codes yet. Redeem coins to get one.</p>';
-    return "<h3>My codes</h3>" + m.rewards.map(function (r) {
-      return '<div class="cc-card"><div class="cc-grow"><div class="cc-t">' + esc(r.title) + '</div><div style="margin:6px 0"><span class="cc-code">' + esc(r.code) +
+    return h("My codes") + m.rewards.map(function (r) {
+      return '<div class="cc-card cc-codecard"><div class="cc-grow"><div class="cc-t">' + esc(r.title) + '</div><div style="margin:6px 0"><span class="cc-code">' + esc(r.code) +
         '</span></div><div class="cc-d">' + date(r.createdAt) + (r.kind === "gift_card" ? " &middot; Gift card, enter at checkout" : " &middot; Enter at checkout") + "</div></div>" +
         '<button type="button" class="cc-btn cc-btn-dark" data-act="copy" data-code="' + esc(r.code) + '">Copy</button></div>';
     }).join("") + '<p class="cc-note">Each code works once and only on your account.</p>';
@@ -186,10 +210,10 @@
 
   function activityView(m) {
     if (!m.activity.length) return '<p class="cc-empty">No activity yet.</p>';
-    return "<h3>History</h3>" + m.activity.map(function (a) {
+    return h("History") + '<div class="cc-card cc-list">' + m.activity.map(function (a) {
       return '<div class="cc-act"><div>' + esc(a.description) + "<small>" + date(a.createdAt) + '</small></div><div class="' + (a.amount >= 0 ? "cc-plus" : "cc-minus") + '">' +
         (a.amount > 0 ? "+" : "") + n(a.amount) + "</div></div>";
-    }).join("");
+    }).join("") + "</div>";
   }
 
   // ---- actions ----

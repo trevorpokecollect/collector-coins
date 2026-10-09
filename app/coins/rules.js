@@ -5,7 +5,7 @@
 export const TIERS = [
   {
     key: "poke",
-    name: "Poke Ball",
+    name: "Poke Tier",
     threshold: 0,
     earnRate: 2, // coins per $1
     birthdayCoins: 0,
@@ -13,7 +13,7 @@ export const TIERS = [
   },
   {
     key: "great",
-    name: "Great Ball",
+    name: "Great Tier",
     threshold: 500,
     earnRate: 3,
     birthdayCoins: 0,
@@ -21,7 +21,7 @@ export const TIERS = [
   },
   {
     key: "ultra",
-    name: "Ultra Ball",
+    name: "Ultra Tier",
     threshold: 3500,
     earnRate: 5,
     birthdayCoins: 200,
@@ -29,7 +29,7 @@ export const TIERS = [
   },
   {
     key: "master",
-    name: "Master Ball",
+    name: "Master Tier",
     threshold: 10000,
     earnRate: 10,
     birthdayCoins: 500,
