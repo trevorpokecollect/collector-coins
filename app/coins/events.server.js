@@ -1,4 +1,5 @@
 // What happens when Shopify or Judge.me tells us something: orders paid, refunds, new customers, reviews, birthdays.
+import { createHmac } from "node:crypto";
 import prisma from "../db.server";
 import { orderEarns, purchaseCoins, refundCoins, toCents, tierByKey, REVIEW_COINS, monthDayInZone, birthdayCoinsDue } from "./rules";
 import { customerIncluded, earnSources, findOrCreateMember, credit, takeBack } from "./ledger.server";
@@ -133,4 +134,16 @@ export async function runBirthdays(now = new Date()) {
     paid++;
   }
   return { paid };
+}
+
+/** Secret for the Judge.me webhook URL: JUDGEME_WEBHOOK_TOKEN, or derived from the app secret so nothing extra needs setting. */
+export function judgemeToken() {
+  if (process.env.JUDGEME_WEBHOOK_TOKEN) return process.env.JUDGEME_WEBHOOK_TOKEN;
+  if (!process.env.SHOPIFY_API_SECRET) return "";
+  return createHmac("sha256", process.env.SHOPIFY_API_SECRET).update("judgeme-webhook").digest("hex").slice(0, 32);
+}
+
+export function judgemeWebhookUrl() {
+  const t = judgemeToken();
+  return t ? `${process.env.SHOPIFY_APP_URL}/judgeme?token=${t}` : null;
 }

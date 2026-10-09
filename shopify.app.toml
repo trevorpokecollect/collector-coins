@@ -4,7 +4,7 @@
 client_id = "REPLACE_WITH_CLIENT_ID"
 name = "Collector Coins"
 handle = "collector-coins"
-application_url = "https://REPLACE_WITH_RAILWAY_URL"
+application_url = "https://coins-app-production.up.railway.app"
 embedded = true
 extension_directories = [ "extensions/*" ]
 
@@ -12,7 +12,7 @@ extension_directories = [ "extensions/*" ]
 scopes = "read_customers,read_orders,read_products,read_inventory,write_discounts,write_gift_cards"
 
 [auth]
-redirect_urls = [ "https://REPLACE_WITH_RAILWAY_URL/api/auth" ]
+redirect_urls = [ "https://coins-app-production.up.railway.app/api/auth" ]
 
 [webhooks]
 api_version = "2025-10"
@@ -26,7 +26,7 @@ api_version = "2025-10"
   uri = "/webhooks"
 
 [app_proxy]
-url = "https://REPLACE_WITH_RAILWAY_URL/proxy"
+url = "https://coins-app-production.up.railway.app/proxy"
 subpath = "coins"
 prefix = "apps"
 

@@ -4,6 +4,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { programMode, testerTag, earnSources } from "../coins/ledger.server";
 import { tierByKey, formatCoins } from "../coins/rules";
+import { judgemeWebhookUrl } from "../coins/events.server";
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
@@ -31,11 +32,13 @@ export const loader = async ({ request }) => {
     mode: programMode(),
     testerTag: testerTag(),
     sources: earnSources().join(", "),
+    judgeme: judgemeWebhookUrl(),
+    klaviyo: Boolean(process.env.KLAVIYO_PRIVATE_KEY),
   };
 };
 
 export default function Members() {
-  const { q, members, count, outstanding, mode, testerTag, sources } = useLoaderData();
+  const { q, members, count, outstanding, mode, testerTag, sources, judgeme, klaviyo } = useLoaderData();
   return (
     <s-page heading="Collector Coins">
       <s-section heading="Program">
@@ -52,6 +55,12 @@ export default function Members() {
             {formatCoins(count)} members · {formatCoins(outstanding)} coins unspent (about ${formatCoins(Math.round(outstanding / 250))} in
             discounts) · Orders that earn: {sources}
           </s-paragraph>
+          <s-paragraph>Klaviyo events: {klaviyo ? "on" : "off (add KLAVIYO_PRIVATE_KEY in Railway)"}</s-paragraph>
+          {judgeme && (
+            <s-paragraph>
+              Judge.me webhook URL (event: review created): <s-text type="strong">{judgeme}</s-text>
+            </s-paragraph>
+          )}
         </s-stack>
       </s-section>
 

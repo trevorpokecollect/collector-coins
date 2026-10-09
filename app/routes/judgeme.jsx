@@ -1,9 +1,9 @@
-// Judge.me "review/created" webhook: POST /judgeme?token=JUDGEME_WEBHOOK_TOKEN
+// Judge.me "review/created" webhook: POST /judgeme?token=<token shown on the app's admin page>
 import { timingSafeEqual } from "node:crypto";
-import { handleReview } from "../coins/events.server";
+import { handleReview, judgemeToken } from "../coins/events.server";
 
 function tokenOk(given) {
-  const want = process.env.JUDGEME_WEBHOOK_TOKEN || "";
+  const want = judgemeToken();
   if (!want || !given || given.length !== want.length) return false;
   return timingSafeEqual(Buffer.from(given), Buffer.from(want));
 }
