@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 # client_id and the Railway URL are filled in once the app exists in the Dev Dashboard (see README).
 
-client_id = "REPLACE_WITH_CLIENT_ID"
+client_id = "6a43efa1af81f7edf25061572e75d72e"
 name = "Collector Coins"
 handle = "collector-coins"
 application_url = "https://coins-app-production.up.railway.app"
