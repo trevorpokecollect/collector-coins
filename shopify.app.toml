@@ -1,0 +1,34 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+# client_id and the Railway URL are filled in once the app exists in the Dev Dashboard (see README).
+
+client_id = "REPLACE_WITH_CLIENT_ID"
+name = "Collector Coins"
+handle = "collector-coins"
+application_url = "https://REPLACE_WITH_RAILWAY_URL"
+embedded = true
+extension_directories = [ "extensions/*" ]
+
+[access_scopes]
+scopes = "read_customers,read_orders,read_products,read_inventory,write_discounts,write_gift_cards"
+
+[auth]
+redirect_urls = [ "https://REPLACE_WITH_RAILWAY_URL/api/auth" ]
+
+[webhooks]
+api_version = "2025-10"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled", "orders/paid", "refunds/create", "customers/create", "customers/update" ]
+  uri = "/webhooks"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks"
+
+[app_proxy]
+url = "https://REPLACE_WITH_RAILWAY_URL/proxy"
+subpath = "coins"
+prefix = "apps"
+
+[pos]
+embedded = false

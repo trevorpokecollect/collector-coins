@@ -1,0 +1,68 @@
+{%- liquid
+  assign show = true
+  if block.settings.visibility == 'testers'
+    assign show = false
+    if customer and customer.tags contains block.settings.tester_tag
+      assign show = true
+    endif
+  endif
+-%}
+{%- if show -%}
+  <div
+    id="cc-root"
+    class="cc-root cc-pos-{{ block.settings.position }}"
+    data-proxy="{{ routes.root_url | remove_last: "/" }}/apps/coins"
+    data-signed-in="{% if customer %}true{% else %}false{% endif %}"
+    data-first-name="{{ customer.first_name | escape }}"
+    data-login-url="{{ routes.account_login_url }}"
+    data-register-url="{{ routes.account_register_url }}"
+    data-landing-url="{{ block.settings.landing_url }}"
+    data-label="{{ block.settings.launcher_label | escape }}"
+    data-take-over="{{ block.settings.take_over_links }}"
+    data-coin="https://poke-collect.com/cdn/shop/files/PokeCollect_Coins_b45f5078-ccb8-4277-87b5-7c38a10f9e0e.png?v=1723056762&width=120"
+    data-hide-launcher="{{ block.settings.hide_launcher }}"
+  ></div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Collector Coins panel",
+  "target": "body",
+  "stylesheet": "coins.css",
+  "javascript": "coins.js",
+  "settings": [
+    {
+      "type": "select",
+      "id": "visibility",
+      "label": "Who sees the panel",
+      "options": [
+        { "value": "testers", "label": "Testers only (customers tagged below)" },
+        { "value": "everyone", "label": "Everyone" }
+      ],
+      "default": "testers",
+      "info": "Keep on Testers only while Smile is still running. Switch to Everyone at cutover."
+    },
+    { "type": "text", "id": "tester_tag", "label": "Tester customer tag", "default": "coins-tester" },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Button position",
+      "options": [
+        { "value": "right", "label": "Bottom right" },
+        { "value": "left", "label": "Bottom left" }
+      ],
+      "default": "right"
+    },
+    { "type": "text", "id": "launcher_label", "label": "Button label", "default": "Collector Coins" },
+    { "type": "checkbox", "id": "hide_launcher", "label": "Hide the floating button (panel still opens from links)", "default": false },
+    {
+      "type": "checkbox",
+      "id": "take_over_links",
+      "label": "Open this panel from Collector Coins links",
+      "info": "Links to #coins-home, #coins-rewards (and the old #smile- links) open this panel.",
+      "default": true
+    },
+    { "type": "text", "id": "landing_url", "label": "Collector Coins page", "default": "/pages/collector-coins" }
+  ]
+}
+{% endschema %}

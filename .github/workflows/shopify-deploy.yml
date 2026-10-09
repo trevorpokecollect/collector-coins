@@ -1,0 +1,32 @@
+name: Deploy Shopify app
+
+# Pushes the app config (webhooks, app proxy, scopes) and the coin panel theme extension to Shopify.
+# Needs the SHOPIFY_APP_AUTOMATION_TOKEN repo secret (Dev Dashboard > app > Settings > App Automation Token).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "extensions/**"
+      - "shopify.app.toml"
+      - ".github/workflows/shopify-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install npm dependencies
+        run: npm ci
+      - name: Install Shopify CLI
+        run: npm install -g @shopify/cli@latest
+      - name: Deploy
+        env:
+          SHOPIFY_APP_AUTOMATION_TOKEN: ${{ secrets.SHOPIFY_APP_AUTOMATION_TOKEN }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        run: shopify app deploy --allow-updates --verbose --source-control-url "$COMMIT_URL"

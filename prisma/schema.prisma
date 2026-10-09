@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Shopify OAuth sessions (used by @shopify/shopify-app-session-storage-prisma)
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+// One row per Collector Coins member (a Shopify customer)
+model Member {
+  id                  String        @id @default(cuid())
+  customerId          String        @unique // numeric Shopify customer id
+  email               String?
+  firstName           String?
+  lastName            String?
+  balance             Int           @default(0)
+  lifetimeEarned      Int           @default(0) // drives the tier; tiers never drop
+  tier                String        @default("poke")
+  birthdayMonth       Int?
+  birthdayDay         Int?
+  birthdayYearAwarded Int?
+  importedFromSmile   Boolean       @default(false)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  transactions        Transaction[]
+  rewards             Reward[]
+
+  @@index([email])
+  @@index([birthdayMonth, birthdayDay])
+}
+
+// The coin ledger: every coin earned or spent is one row. balance = sum(amount).
+model Transaction {
+  id          String   @id @default(cuid())
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  amount      Int      // + earned, - spent or taken back
+  kind        String   // purchase | refund | review | birthday | tier_bonus | redeem | redeem_undo | adjust | import
+  description String
+  orderId     String?
+  earnRate    Int?     // coins per $1 used for a purchase, reused when a refund takes coins back
+  countsToTier Boolean @default(true)
+  idemKey     String?  @unique // stops a webhook delivered twice from paying twice
+  staff       String?
+  createdAt   DateTime @default(now())
+
+  @@index([memberId, createdAt])
+  @@index([orderId])
+}
+
+// Codes and gift cards a member holds
+model Reward {
+  id         String   @id @default(cuid())
+  memberId   String
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  kind       String   // order_discount | free_product | gift_card | tier_discount
+  title      String
+  coins      Int      @default(0)
+  code       String?
+  shopifyId  String?
+  valueCents Int      @default(0)
+  productId  String?
+  idemKey    String?  @unique
+  createdAt  DateTime @default(now())
+
+  @@index([memberId, createdAt])
+}
