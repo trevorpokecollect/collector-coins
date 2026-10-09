@@ -38,6 +38,8 @@
 .ccp-launcher img { width: 34px; height: 34px; border-radius: 50%; }
 .ccp-launcher .ccp-launcher-bal { background: var(--ccp-yellow); color: var(--ccp-dark); border-radius: 999px; padding: 4px 9px; font-size: 15px; }
 .ccp-root.ccp-no-launcher .ccp-launcher { display: none; }
+.ccp-root.ccp-tucked:not(.ccp-open) .ccp-launcher { opacity: 0; pointer-events: none; transform: translateY(12px); }
+.ccp-launcher { transition: opacity .2s ease, transform .2s ease; }
 
 /* Panel shell */
 .ccp-panel {
@@ -170,6 +172,10 @@ span.ccp-ticon-lg { font-size: 24px; }
 .ccp-ok { background: #e9f8ee; color: #135c2b; border-radius: 12px; padding: 14px; margin-top: 14px; font-weight: 600; }
 .ccp-empty { color: var(--ccp-muted); text-align: center; padding: 26px 0; font: 600 15px var(--ccp-text); }
 
+/* Phones: no floating button. The panel opens from Collector Coins links (landing page buttons, #coins-home). */
+@media (max-width: 749px) {
+  .ccp-launcher { display: none !important; }
+}
 @media (max-width: 520px) {
   .ccp-root { bottom: 12px; }
   .ccp-pos-right { right: 12px; }

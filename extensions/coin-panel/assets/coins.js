@@ -295,5 +295,66 @@
   var startKey = (location.hash.match(/^#coins-([\w-]+)/) || [])[1];
   if (startKey) open(LINK_VIEWS[startKey] || "home");
 
+
+  // ---- keep the floating button clear of the site's own fixed UI (cart drawer, sticky add-to-cart bars) ----
+  var launcher = root.querySelector(".ccp-launcher");
+  var baseBottom = null;
+  function isFixed(el) {
+    for (var e = el; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+      var pos = getComputedStyle(e).position;
+      if (pos === "fixed" || pos === "sticky") return e;
+    }
+    return null;
+  }
+  function avoidOverlap() {
+    if (root.classList.contains("ccp-open") || !launcher || launcher.offsetParent === null) return;
+    if (baseBottom === null) baseBottom = parseFloat(getComputedStyle(root).bottom) || 20;
+    var prev = root.style.bottom;
+    root.style.bottom = baseBottom + "px";
+    var r = launcher.getBoundingClientRect();
+    var points = [[r.left + 4, r.top + 4], [r.right - 4, r.top + 4], [r.left + 4, r.bottom - 4], [r.right - 4, r.bottom - 4], [r.left + r.width / 2, r.top + r.height / 2]];
+    var vh = window.innerHeight, lift = 0, covered = false;
+    points.forEach(function (pt) {
+      document.elementsFromPoint(pt[0], pt[1]).forEach(function (el) {
+        if (root.contains(el) || el === document.body || el === document.documentElement) return;
+        var f = isFixed(el);
+        if (!f) return;
+        var fr = f.getBoundingClientRect();
+        if (fr.height > vh * 0.5) covered = true; // a drawer or overlay: get out of the way
+        else lift = Math.max(lift, vh - fr.top); // a bar along the bottom: sit above it
+      });
+    });
+    root.classList.toggle("ccp-tucked", covered);
+    var next = !covered && lift ? Math.round(lift + 12) + "px" : baseBottom + "px";
+    if (next !== prev) root.style.bottom = next; else root.style.bottom = prev;
+  }
+  var avoidTimer;
+  function scheduleAvoid() { clearTimeout(avoidTimer); avoidTimer = setTimeout(avoidOverlap, 120); }
+  ["scroll", "resize", "click", "keyup"].forEach(function (ev) { window.addEventListener(ev, scheduleAvoid, { passive: true }); });
+  new MutationObserver(function (records) {
+    // Ignore our own changes (moving the button is itself a style change).
+    if (records.some(function (rec) { return !root.contains(rec.target); })) scheduleAvoid();
+  }).observe(document.body, { attributes: true, childList: true, subtree: true, attributeFilter: ["class", "style", "open", "aria-hidden"] });
+  setTimeout(avoidOverlap, 800);
+
+  // ---- landing page: fill the rewards grid from live stock ----
+  var grid = document.querySelector(".pc-cc #rewards .cc-rewards");
+  if (grid) {
+    fetch(cfg.proxy + "/prizes", { headers: { Accept: "application/json" } }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d || !d.prizes || !d.prizes.length) return;
+      var coinImg = '<img src="' + esc(COIN) + '" alt="" width="20" height="20">';
+      var tiles = d.prizes.map(function (z) {
+        var img = z.image ? '<img src="' + esc(z.image + (z.image.indexOf("?") < 0 ? "?" : "&") + "width=400") + '" alt="' + esc(z.title) + '" loading="lazy">' : "";
+        return '<a class="cc-reward" href="' + esc(z.url) + '"><div class="cc-reward-img">' + img + '</div><div class="cc-reward-body"><h3>Free ' + esc(z.title) +
+          '</h3><span class="cc-cost">' + coinImg + n(z.coins) + " coins</span></div></a>";
+      }).join("");
+      grid.innerHTML =
+        '<div class="cc-reward cc-reward--discount"><div class="cc-reward-img"><div class="cc-num">$1 Off</div><span>For every ' + n(d.coinsPerDollarOff) + ' coins</span></div>' +
+        '<div class="cc-reward-body"><h3>Order Discount</h3><span class="cc-cost">' + coinImg + n(d.coinsPerDollarOff) + " = $1</span></div></div>" + tiles +
+        '<a class="cc-reward cc-reward--discount" href="#coins-rewards"><div class="cc-reward-img"><div class="cc-num">Redeem</div><span>Open your coin panel</span></div>' +
+        '<div class="cc-reward-body"><h3>Ready to Cash In?</h3><span class="cc-cost">Redeem Now &rarr;</span></div></a>';
+    }).catch(function () {});
+  }
+
   window.CollectorCoins = { open: open, close: close };
 })();
