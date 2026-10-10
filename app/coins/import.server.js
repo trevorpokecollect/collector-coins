@@ -4,7 +4,7 @@ import prisma from "../db.server";
 import { parseCsv, toInt, tierKeyFromName, parseBirthday } from "./csv";
 import { tierIndex, tierForLifetime, isValidBirthday } from "./rules";
 import { adminClient, findCustomersByEmail } from "./shopify.server";
-import { findOrCreateMember } from "./ledger.server";
+import { findOrCreateMember, programMode } from "./ledger.server";
 
 const job = (globalThis.__coinsImport ||= { running: false });
 
@@ -39,6 +39,9 @@ function toRow(r, map) {
 
 export function startImport(text, mapping, staff) {
   if (job.running) throw new Error("An import is already running.");
+  // The import sets balances to Smile's numbers. Once the program is live that would wipe coins earned here
+  // and give back coins already spent, so it only runs while PROGRAM_MODE is testing.
+  if (programMode() === "live") throw new Error("The program is live, so importing from Smile is switched off: it would overwrite balances customers have earned and spent since.");
   const { records } = parseCsv(text);
   const rows = records.map((r) => toRow(r, mapping)).filter((r) => r.email);
   Object.assign(job, {

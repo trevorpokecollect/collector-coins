@@ -171,3 +171,58 @@ export async function listPrizes(admin, { fresh = false } = {}) {
   prizeCache = { at: Date.now(), list };
   return list;
 }
+
+const DEACTIVATE_CODE = `#graphql
+mutation DeactivateCode($id: ID!) {
+  discountCodeDeactivate(id: $id) { codeDiscountNode { id } userErrors { field message } }
+}`;
+
+const DEACTIVATE_GIFT_CARD = `#graphql
+mutation DeactivateGiftCard($id: ID!) {
+  giftCardDeactivate(id: $id) { giftCard { id enabled } userErrors { field message } }
+}`;
+
+/** Switch off a reward's discount code or gift card in Shopify (used when a refund takes a tier away). */
+export async function deactivateReward(admin, reward) {
+  if (!reward.shopifyId) return;
+  if (reward.shopifyId.includes("/GiftCard/")) {
+    const data = await gql(admin, DEACTIVATE_GIFT_CARD, { id: reward.shopifyId });
+    userErrorsOrThrow(data.giftCardDeactivate.userErrors, "Gift card deactivate");
+  } else {
+    const data = await gql(admin, DEACTIVATE_CODE, { id: reward.shopifyId });
+    userErrorsOrThrow(data.discountCodeDeactivate.userErrors, "Discount deactivate");
+  }
+}
+
+const ORDER_TOTALS = `#graphql
+query OrderTotals($id: ID!) {
+  order(id: $id) { subtotalPriceSet { shopMoney { amount } } totalTaxSet { shopMoney { amount } } }
+}`;
+
+/** An order's original subtotal and tax in cents, for working out the merchandise part of an amount-only refund. */
+export async function getOrderTotals(admin, orderId) {
+  const id = String(orderId).startsWith("gid://") ? String(orderId) : `gid://shopify/Order/${orderId}`;
+  const data = await gql(admin, ORDER_TOTALS, { id });
+  if (!data.order) return null;
+  return {
+    subtotalCents: toCents(data.order.subtotalPriceSet?.shopMoney?.amount),
+    taxCents: toCents(data.order.totalTaxSet?.shopMoney?.amount),
+  };
+}
+
+const CUSTOMER_ORDERS = `#graphql
+query CustomerOrders($q: String!) {
+  orders(first: 50, query: $q, sortKey: CREATED_AT, reverse: true) {
+    nodes { lineItems(first: 100) { nodes { product { id } } } }
+  }
+}`;
+
+/**
+ * Whether the customer has a paid order containing the product. The app's read_orders access only reaches the
+ * last 60 days of orders, which covers Judge.me's review requests (sent after delivery).
+ */
+export async function customerBoughtProduct(admin, customerId, productId) {
+  const want = numericId(productId);
+  const data = await gql(admin, CUSTOMER_ORDERS, { q: `customer_id:${numericId(customerId)} AND (financial_status:paid OR financial_status:partially_refunded)` });
+  return (data.orders?.nodes || []).some((o) => o.lineItems.nodes.some((li) => li.product && numericId(li.product.id) === want));
+}

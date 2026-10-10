@@ -84,6 +84,7 @@ model Reward {
   valueCents Int      @default(0)
   productId  String?
   idemKey    String?  @unique
+  prevTier   String?  // for tier rewards: the tier the member was in before, so a refund can put them back
   createdAt  DateTime @default(now())
 
   @@index([memberId, createdAt])

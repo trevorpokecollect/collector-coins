@@ -82,3 +82,46 @@ test("expiry and alerts", () => {
   assert.equal(redemptionAlertThreshold(2000), 10000);
   assert.equal(redemptionAlertThreshold(50000), 150000);
 });
+
+import { earnableSubtotalCents, refundedMerchCents, orderSource, TIER_REVOKE_DAYS } from "../app/coins/rules.js";
+
+test("Shop app orders are recognised and can earn", () => {
+  const order = { customer: { id: 1 }, source_name: "3890849" };
+  assert.equal(orderSource(order), "shop");
+  assert.deepEqual(orderEarns(order, ["web", "shop"]), { ok: true });
+  assert.equal(orderEarns(order, ["web"]).ok, false);
+  assert.equal(orderEarns({ customer: { id: 1 }, source_name: "292572659713" }, ["web", "shop"]).reason, "source whatnot");
+});
+
+test("gift cards bought on an order don't earn", () => {
+  const order = {
+    current_subtotal_price: "130.00",
+    line_items: [
+      { price: "30.00", quantity: 1, gift_card: false },
+      { price: "50.00", quantity: 2, gift_card: true, discount_allocations: [] },
+    ],
+  };
+  assert.equal(earnableSubtotalCents(order), 3000);
+  assert.equal(earnableSubtotalCents({ current_subtotal_price: "40.00" }), 4000);
+  assert.equal(earnableSubtotalCents({ current_subtotal_price: "50.00", line_items: [{ price: "50.00", quantity: 1, gift_card: true }] }), 0);
+});
+
+test("refunded merchandise: items, gift cards, and amount-only refunds", () => {
+  // Item refund: subtotals of refunded items, gift card items skipped
+  assert.equal(refundedMerchCents({
+    refund_line_items: [{ subtotal: "20.00", line_item: { gift_card: false } }, { subtotal: "50.00", line_item: { gift_card: true } }],
+  }), 2000);
+  // Amount-only refund of $54.50 on an order with $100 subtotal + $9 tax: tax removed -> $50
+  const amountOnly = { refund_line_items: [], transactions: [{ kind: "refund", status: "success", amount: "54.50" }], order_adjustments: [] };
+  assert.equal(refundedMerchCents(amountOnly, { subtotalCents: 10000, taxCents: 900 }), 5000);
+  // Shipping-only refund takes nothing back
+  const shipOnly = {
+    refund_line_items: [],
+    transactions: [{ kind: "refund", status: "success", amount: "8.00" }],
+    order_adjustments: [{ kind: "shipping_refund", amount: "-8.00", tax_amount: "0.00" }],
+  };
+  assert.equal(refundedMerchCents(shipOnly, { subtotalCents: 10000, taxCents: 900 }), 0);
+  // Failed refund transactions don't count
+  assert.equal(refundedMerchCents({ transactions: [{ kind: "refund", status: "failure", amount: "10.00" }] }, null), 0);
+  assert.ok(TIER_REVOKE_DAYS >= 30);
+});

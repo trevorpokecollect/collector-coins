@@ -3,6 +3,7 @@ import { Form, useActionData, useLoaderData, useNavigation, useRevalidator } fro
 import { useEffect } from "react";
 import { authenticate } from "../shopify.server";
 import { previewCsv, startImport, importStatus } from "../coins/import.server";
+import { programMode } from "../coins/ledger.server";
 import { detectColumns } from "../coins/csv";
 import { formatCoins, tierByKey } from "../coins/rules";
 
@@ -17,7 +18,7 @@ const FIELDS = [
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
-  return { status: importStatus(), fileName: upload.name };
+  return { status: importStatus(), fileName: upload.name, live: programMode() === "live" };
 };
 
 export const action = async ({ request }) => {
@@ -55,7 +56,7 @@ const btn = { padding: "6px 14px", borderRadius: 8, border: "1px solid #c9c9c9",
 const primary = { background: "#303030", color: "#fff", borderColor: "#303030" };
 
 export default function ImportPage() {
-  const { status, fileName } = useLoaderData();
+  const { status, fileName, live } = useLoaderData();
   const result = useActionData();
   const nav = useNavigation();
   const revalidator = useRevalidator();
@@ -73,6 +74,12 @@ export default function ImportPage() {
   return (
     <s-page heading="Import from Smile">
       {result?.error && <s-banner tone="critical">{result.error}</s-banner>}
+      {live && (
+        <s-banner tone="warning">
+          The program is live, so importing is switched off. An import sets balances to Smile's numbers, which would undo coins customers have
+          earned and spent since launch.
+        </s-banner>
+      )}
 
       {(status.running || status.finishedAt) && (
         <s-section heading={status.running ? "Importing…" : "Last import"}>
@@ -143,7 +150,7 @@ export default function ImportPage() {
               <s-stack direction="inline" gap="base">
                 {/* Native buttons so the clicked button's intent is submitted with the form */}
                 <button type="submit" name="intent" value="preview" style={btn}>Update preview</button>
-                <button type="submit" name="intent" value="import" disabled={status.running} style={{ ...btn, ...primary }}>
+                <button type="submit" name="intent" value="import" disabled={status.running || live} style={{ ...btn, ...primary }}>
                   Import {formatCoins(preview.withEmail)} members
                 </button>
               </s-stack>

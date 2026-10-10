@@ -127,14 +127,62 @@ export function discountDollarsForCoins(coins) {
   return Math.floor(coins / COINS_PER_DOLLAR_OFF);
 }
 
-/** Whether a Shopify order counts: online store only by default (POS and Whatnot don't earn). */
+// Some sales channels report a numeric app id as the order's source_name. Readable names for the ones we use.
+export const SOURCE_ALIASES = { "3890849": "shop", "292572659713": "whatnot" };
+
+export function orderSource(order) {
+  const raw = String(order?.source_name || "").toLowerCase();
+  return SOURCE_ALIASES[raw] || raw;
+}
+
+/** Whether a Shopify order counts: online store (and Shop app if allowed); POS and Whatnot don't earn. */
 export function orderEarns(order, allowedSources) {
   if (!order || !order.customer || !order.customer.id) return { ok: false, reason: "no customer" };
   if (order.test) return { ok: false, reason: "test order" };
-  const source = String(order.source_name || "").toLowerCase();
+  const source = orderSource(order);
   if (!allowedSources.includes(source)) return { ok: false, reason: `source ${source || "unknown"}` };
   return { ok: true };
 }
+
+const lineDiscountCents = (li) => (li.discount_allocations || []).reduce((sum, d) => sum + toCents(d.amount), 0);
+
+/**
+ * The part of an order's subtotal (after discounts) that earns coins. Gift cards bought on the order don't earn:
+ * the coins come when the gift card is spent.
+ */
+export function earnableSubtotalCents(order) {
+  const subtotal = toCents(order.current_subtotal_price ?? order.subtotal_price);
+  const giftCards = (order.line_items || [])
+    .filter((li) => li.gift_card)
+    .reduce((sum, li) => {
+      const qty = li.current_quantity ?? li.quantity ?? 0;
+      return sum + Math.max(0, toCents(li.price) * qty - lineDiscountCents(li));
+    }, 0);
+  return Math.max(0, subtotal - giftCards);
+}
+
+/**
+ * How much of a refund was for merchandise that earned coins, before tax.
+ * Item refunds: the refunded items' subtotals (gift cards excluded).
+ * Amount-only refunds (no items picked): the money returned, less any shipping refund, with tax removed at the
+ * order's own tax rate. `order` is { subtotalCents, taxCents } and is only needed for amount-only refunds.
+ */
+export function refundedMerchCents(refund, order) {
+  const items = (refund.refund_line_items || []).filter((rli) => !rli.line_item?.gift_card);
+  if ((refund.refund_line_items || []).length) return items.reduce((sum, rli) => sum + toCents(rli.subtotal), 0);
+  const moneyBack = (refund.transactions || [])
+    .filter((t) => t.kind === "refund" && t.status === "success")
+    .reduce((sum, t) => sum + toCents(t.amount), 0);
+  const shipping = (refund.order_adjustments || [])
+    .filter((a) => a.kind === "shipping_refund")
+    .reduce((sum, a) => sum + Math.abs(toCents(a.amount)) + Math.abs(toCents(a.tax_amount)), 0);
+  const merchWithTax = Math.max(0, moneyBack - shipping);
+  if (!order || order.subtotalCents <= 0) return merchWithTax;
+  return Math.floor((merchWithTax * order.subtotalCents) / (order.subtotalCents + Math.max(0, order.taxCents)));
+}
+
+/** A tier reached this recently can be taken away if a refund drops the member's lifetime coins below it. */
+export const TIER_REVOKE_DAYS = 60;
 
 /** Today's month and day in the store's time zone. */
 export function monthDayInZone(date, timeZone = "America/Chicago") {
