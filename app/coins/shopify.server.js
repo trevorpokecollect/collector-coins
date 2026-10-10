@@ -73,7 +73,7 @@ mutation CreateGiftCard($input: GiftCardCreateInput!) {
 
 export async function createGiftCard(admin, { customerId, amountCents, note }) {
   const data = await gql(admin, CREATE_GIFT_CARD, {
-    input: { initialValue: (amountCents / 100).toFixed(2), customerId: customerGid(customerId), note },
+    input: { initialValue: (amountCents / 100).toFixed(2), ...(customerId ? { customerId: customerGid(customerId) } : {}), note },
   });
   userErrorsOrThrow(data.giftCardCreate.userErrors, "Gift card");
   return { id: data.giftCardCreate.giftCard.id, code: data.giftCardCreate.giftCardCode };

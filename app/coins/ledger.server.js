@@ -209,8 +209,16 @@ export async function issueTierEntry(member, tier) {
               note: `Collector Coins ${tier.name} reward`,
             });
           } catch (err) {
-            // No gift card access: fall back to a one-time discount code of the same value.
-            console.error("Gift card failed, issuing a discount code instead", err.message);
+            // Attaching a gift card to a customer needs write_customers, which the app doesn't have.
+            // An unattached gift card works the same at checkout (balance carries over, covers shipping/tax).
+            try {
+              made = await createGiftCard(admin, {
+                amountCents: entry.giftCardCents,
+                note: `Collector Coins ${tier.name} reward for customer ${member.customerId}`,
+              });
+            } catch (err2) {
+            // No gift card access at all: fall back to a one-time discount code of the same value.
+            console.error("Gift card failed, issuing a discount code instead", err.message, "/", err2.message);
             made = await createDiscountCode(admin, {
               code: makeCode("VIP"),
               title: `Collector Coins ${tier.name} reward`,
@@ -218,6 +226,7 @@ export async function issueTierEntry(member, tier) {
               amountCents: entry.giftCardCents,
             });
             await prisma.reward.update({ where: { id: claim.id }, data: { kind: "tier_discount", title: `${tier.name}: ${formatMoney(entry.giftCardCents)} off` } });
+            }
           }
         } else {
           made = await createDiscountCode(admin, {
