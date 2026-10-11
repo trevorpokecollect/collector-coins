@@ -82,7 +82,7 @@
       $body.innerHTML = signedOut();
     } else {
       var next = m.next;
-      var pct = next ? Math.min(100, Math.round((100 * (m.lifetimeEarned - tierThreshold(m.tier))) / (next.threshold - tierThreshold(m.tier)))) : 100;
+      var pct = next ? Math.max(0, Math.min(100, Math.round((100 * (m.lifetimeEarned - tierThreshold(m.tier))) / (next.threshold - tierThreshold(m.tier))))) : 100;
       $head.innerHTML =
         '<button class="ccp-close" aria-label="Close">&times;</button>' +
         "<h2>" + (m.firstName ? "Hi " + esc(m.firstName) : "Collector Coins") + "</h2>" +

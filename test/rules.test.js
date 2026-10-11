@@ -5,19 +5,28 @@ import {
   discountDollarsForCoins, orderEarns, birthdayCoinsDue, isValidBirthday, makeCode, monthDayInZone, expiryDate, redemptionAlertThreshold,
 } from "../app/coins/rules.js";
 
-test("tiers by lifetime coins", () => {
+test("tiers by lifetime coins (levels doubled Oct 11 2026)", () => {
   assert.equal(tierForLifetime(0).key, "poke");
-  assert.equal(tierForLifetime(499).key, "poke");
-  assert.equal(tierForLifetime(500).key, "great");
-  assert.equal(tierForLifetime(3500).key, "ultra");
-  assert.equal(tierForLifetime(10000).key, "master");
+  assert.equal(tierForLifetime(999).key, "poke");
+  assert.equal(tierForLifetime(1000).key, "great");
+  assert.equal(tierForLifetime(6999).key, "great");
+  assert.equal(tierForLifetime(7000).key, "ultra");
+  assert.equal(tierForLifetime(20000).key, "master");
+  // Tiers reached before the change are judged at the old levels
+  const before = "2026-10-10T12:00:00Z", after = "2026-10-12T12:00:00Z";
+  assert.equal(tierForLifetime(500, { at: before }).key, "great");
+  assert.equal(tierForLifetime(3500, { at: before }).key, "ultra");
+  assert.equal(tierForLifetime(10000, { at: before }).key, "master");
+  assert.equal(tierForLifetime(3500, { at: after }).key, "great");
 });
 
-test("tiers never drop", () => {
+test("tiers never drop (existing members keep their tier under the new levels)", () => {
   assert.equal(resolveTier("ultra", 100).key, "ultra");
-  assert.equal(resolveTier("great", 4000).key, "ultra");
+  assert.equal(resolveTier("great", 800).key, "great"); // Great under the old 500 level keeps it
+  assert.equal(resolveTier("great", 8000).key, "ultra");
   assert.equal(nextTier("master", 50000), null);
-  assert.equal(nextTier("great", 1000).coinsToGo, 2500);
+  assert.equal(nextTier("great", 1000).coinsToGo, 6000);
+  assert.equal(nextTier("great", 800).coinsToGo, 6200);
 });
 
 test("money parsing", () => {

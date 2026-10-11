@@ -14,7 +14,7 @@ export const TIERS = [
   {
     key: "great",
     name: "Great Tier",
-    threshold: 500,
+    threshold: 1000,
     earnRate: 3,
     birthdayCoins: 0,
     entry: { giftCardCents: 2500, title: "$25 gift card" },
@@ -22,7 +22,7 @@ export const TIERS = [
   {
     key: "ultra",
     name: "Ultra Tier",
-    threshold: 3500,
+    threshold: 7000,
     earnRate: 5,
     birthdayCoins: 200,
     entry: { giftCardCents: 5000, bonusCoins: 1000, title: "$50 gift card + 1,000 bonus coins" },
@@ -30,7 +30,7 @@ export const TIERS = [
   {
     key: "master",
     name: "Master Tier",
-    threshold: 10000,
+    threshold: 20000,
     earnRate: 10,
     birthdayCoins: 500,
     entry: { giftCardCents: 10000, bonusCoins: 2500, title: "$100 gift card + 2,500 bonus coins" },
@@ -71,10 +71,16 @@ export function tierIndex(key) {
   return i < 0 ? 0 : i;
 }
 
-/** The tier a lifetime total qualifies for. */
-export function tierForLifetime(lifetimeEarned) {
+// Tier levels were doubled on Oct 11 2026 (from 500 / 3,500 / 10,000). Members keep the tier they already had,
+// and a tier reached before the change is judged against the old levels (e.g. when a refund could take it back).
+export const TIER_LEVELS_CHANGED_AT = Date.parse("2026-10-11T18:00:00Z");
+export const PREVIOUS_THRESHOLDS = { poke: 0, great: 500, ultra: 3500, master: 10000 };
+
+/** The tier a lifetime total qualifies for, at today's levels or (with `at` before the change) the old ones. */
+export function tierForLifetime(lifetimeEarned, { at } = {}) {
+  const old = at != null && new Date(at).getTime() < TIER_LEVELS_CHANGED_AT;
   let tier = TIERS[0];
-  for (const t of TIERS) if (lifetimeEarned >= t.threshold) tier = t;
+  for (const t of TIERS) if (lifetimeEarned >= (old ? PREVIOUS_THRESHOLDS[t.key] : t.threshold)) tier = t;
   return tier;
 }
 

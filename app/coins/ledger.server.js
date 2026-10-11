@@ -284,13 +284,13 @@ export async function revokeTiersAfterRefund(memberId, { now = new Date() } = {}
     const bonusTakenBack = bonus
       ? Boolean(await prisma.transaction.findUnique({ where: { idemKey: `tierbonus-revoke:${bonus.id}` } }))
       : true;
-    // Judge the tier without its own bonus: those coins only exist because of the tier.
-    const lifetimeWithoutBonus = Math.max(0, m.lifetimeEarned - (bonusTakenBack ? 0 : bonus.amount));
-    const qualifies = tierIndex(tierForLifetime(lifetimeWithoutBonus).key);
-    if (cur <= qualifies) break;
-
     const reachedAt = reward?.createdAt || bonus?.createdAt;
     if (!reachedAt || reachedAt < since) break; // reached long ago, or carried over from Smile: keep it
+    // Judge the tier without its own bonus (those coins only exist because of the tier), against the tier levels
+    // that applied when it was reached.
+    const lifetimeWithoutBonus = Math.max(0, m.lifetimeEarned - (bonusTakenBack ? 0 : bonus.amount));
+    const qualifies = tierIndex(tierForLifetime(lifetimeWithoutBonus, { at: reachedAt }).key);
+    if (cur <= qualifies) break;
     if (!reward?.prevTier && m.importedFromSmile) break; // reached before we recorded the prior tier: can't tell its Smile tier
 
     const back = TIERS[Math.min(cur - 1, Math.max(qualifies, reward?.prevTier ? tierIndex(reward.prevTier) : 0))];
