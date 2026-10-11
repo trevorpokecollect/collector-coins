@@ -195,3 +195,10 @@ span.ccp-ticon-lg { font-size: 24px; }
 .ccp-promo-t { font: 700 17px/1.1 var(--ccp-display); text-transform: uppercase; letter-spacing: .02em; color: #fff; }
 .ccp-promo .ccp-d { color: rgba(255,255,255,.9); }
 .ccp-promo-go { font-size: 28px; line-height: 1; opacity: .9; }
+
+/* Text + email alerts sign-up card */
+.ccp-alerts { display: grid; gap: 10px; }
+.ccp-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 2px solid #1a1a1a; border-radius: 10px; font: 600 15px/1.2 var(--ccp-text); background: #fff; color: #121212; }
+.ccp-consent { display: flex; gap: 8px; align-items: flex-start; font: 500 11px/1.4 var(--ccp-text); color: #555; }
+.ccp-consent input { margin-top: 2px; flex: 0 0 auto; }
+.ccp-consent a { color: inherit; text-decoration: underline; }

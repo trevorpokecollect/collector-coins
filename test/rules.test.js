@@ -185,3 +185,15 @@ test("3x Mystery Pack promotion: dates, matching lines, bonus and refunds", () =
   assert.equal(refundCoinsWithPromo(7894, 2, 5894, 4, 392, 300), 92);
   assert.ok(PROMOTIONS.length >= 1);
 });
+
+import { normalizeUsPhone, ALERTS_SIGNUP_COINS } from "../app/coins/rules.js";
+
+test("US phone numbers for text alerts", () => {
+  assert.equal(normalizeUsPhone("(205) 555-0142"), "+12055550142");
+  assert.equal(normalizeUsPhone("1-205-555-0142"), "+12055550142");
+  assert.equal(normalizeUsPhone("+1 205 555 0142"), "+12055550142");
+  assert.equal(normalizeUsPhone("555-0142"), null);
+  assert.equal(normalizeUsPhone("(105) 555-0142"), null);
+  assert.equal(normalizeUsPhone("44 7700 900123"), null);
+  assert.equal(ALERTS_SIGNUP_COINS, 200);
+});

@@ -38,6 +38,7 @@ export const TIERS = [
 ];
 
 export const REVIEW_COINS = 100;
+export const ALERTS_SIGNUP_COINS = 200; // once per account (and per phone number) for joining text + email alerts
 export const MAX_REVIEW_REWARDS = 3; // product reviews that earn coins, per account, ever
 export const GOOGLE_REVIEW_COINS = 500;
 export const COINS_PER_DOLLAR_OFF = 250; // order discount: 250 coins = $1 off
@@ -265,6 +266,14 @@ export function refundCoinsWithPromo(refundedCents, earnRate, promoCents, extraR
 
 /** A tier reached this recently can be taken away if a refund drops the member's lifetime coins below it. */
 export const TIER_REVOKE_DAYS = 60;
+
+/** A US mobile number as +1XXXXXXXXXX, or null if it isn't one. */
+export function normalizeUsPhone(input) {
+  const digits = String(input || "").replace(/\D/g, "");
+  const ten = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (ten.length !== 10 || /^[01]/.test(ten) || /^\d{3}[01]/.test(ten)) return null; // NANP: area and exchange can't start with 0/1
+  return `+1${ten}`;
+}
 
 /** Today's month and day in the store's time zone. */
 export function monthDayInZone(date, timeZone = "America/Chicago") {

@@ -123,6 +123,7 @@
     purchase: '<path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
     review: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z"/>',
     google: '<path d="M4 5h16v11H9l-5 4V5z"/><path d="M12 8l1 2 2 .3-1.5 1.4.4 2.1-1.9-1-1.9 1 .4-2.1L9 10.3l2-.3 1-2z"/>',
+    alerts: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
     birthday: '<rect x="4" y="10" width="16" height="10" rx="1"/><path d="M4 14h16M12 10v10M12 10c-2-3-5-3-5-1s3 1 5 1zm0 0c2-3 5-3 5-1s-3 1-5 1z"/>',
   };
   function icon(key) {
@@ -177,7 +178,21 @@
         '<div class="ccp-bday"><select data-bday="month" aria-label="Month">' + MONTHS.map(function (x, i) { return '<option value="' + (i + 1) + '">' + x + "</option>"; }).join("") +
         '</select><select data-bday="day" aria-label="Day">' + Array.from({ length: 31 }, function (_, i) { return '<option value="' + (i + 1) + '">' + (i + 1) + "</option>"; }).join("") +
         '</select><button type="button" class="ccp-btn" data-act="birthday">Save</button></div></div>';
-    return h("Ways to earn") + earnList(state.program) + b + h("Tiers") + tierGrid(state.program, m.tier);
+    return alertsCard(m) + h("Ways to earn") + earnList(state.program) + b + h("Tiers") + tierGrid(state.program, m.tier);
+  }
+
+  // Text + email alerts sign-up: 200 coins, once per account.
+  function alertsCard(m) {
+    if (m.alertsClaimed) return "";
+    var coins = n(state.program.alertsCoins || 200);
+    return '<div class="ccp-card ccp-alerts">' +
+      '<div class="ccp-earn-top">' + icon("alerts") + '<div class="ccp-grow"><div class="ccp-t">Never Miss A Drop</div>' +
+      '<div class="ccp-d">Get a text and email when new sets drop, hot items restock and pre-orders open. Join and we&rsquo;ll add ' + coins + ' Collector Coins.</div></div>' +
+      '<span class="ccp-pill">+' + coins + "</span></div>" +
+      '<input class="ccp-input" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Mobile number" data-alerts="phone" aria-label="Mobile number">' +
+      '<label class="ccp-consent"><input type="checkbox" data-alerts="consent"> <span>Yes, send me texts and emails. I agree to receive recurring automated marketing texts and emails from Poke-Collect, including drop and restock alerts, at the number' +
+      (m.email ? " and email (" + esc(m.email) + ")" : " and email") + ' provided. Consent is not a condition of purchase. Msg &amp; data rates may apply. Msg frequency varies. Reply HELP for help or STOP to cancel. See our <a href="/policies/terms-of-service" target="_blank">Terms</a> and <a href="/policies/privacy-policy" target="_blank">Privacy Policy</a>.</span></label>' +
+      '<button type="button" class="ccp-btn ccp-btn-red ccp-btn-block" data-act="alerts"' + (busy ? " disabled" : "") + ">Turn On Alerts &middot; +" + coins + " Coins</button></div>";
   }
 
   function prizeCard(z, m) {
@@ -260,6 +275,15 @@
       var z = state.prizes.filter(function (p) { return p.productId === b.dataset.id; })[0];
       if (!z || !confirm("Spend " + n(z.coins) + " coins on Free " + z.title + "?")) return;
       redeem({ type: "prize", productId: z.productId });
+    } else if (act === "alerts") {
+      var phone = $body.querySelector('[data-alerts="phone"]').value;
+      var consent = $body.querySelector('[data-alerts="consent"]').checked;
+      if (!consent) { flash = { type: "err", html: "Check the box to agree to texts and emails." }; render(); return; }
+      busy = true; render();
+      api("/alerts", { phone: phone, consent: true })
+        .then(function (r) { state = r.state; updateLauncher(); flash = { type: "ok", html: "<b>Alerts are on!</b> We added " + n(r.coins) + " Collector Coins to your account." }; })
+        .catch(function (err) { flash = { type: "err", html: esc(err.message) }; })
+        .then(function () { busy = false; render(); $body.scrollTop = 0; });
     } else if (act === "birthday") {
       var mo = $body.querySelector('[data-bday="month"]').value, d = $body.querySelector('[data-bday="day"]').value;
       if (!confirm("Save " + MONTHS[mo - 1] + " " + d + " as your birthday? It can only be set once.")) return;

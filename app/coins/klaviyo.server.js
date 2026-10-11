@@ -101,3 +101,64 @@ function retryOrLog(metric, key, body, attemptsLeft, reason) {
   }
   console.error(`Klaviyo ${metric} failed: ${reason}`);
 }
+
+// ---- marketing sign-ups (text + email alerts) ------------------------------------------------------
+// Needs the private key's "Subscriptions: write" and "Lists: write" scopes. Lists default to the store's
+// "Email List" and "SMS List"; override with KLAVIYO_EMAIL_LIST_ID / KLAVIYO_SMS_LIST_ID.
+
+const SUBSCRIBE_URL = "https://a.klaviyo.com/api/profile-subscription-bulk-create-jobs";
+
+function klaviyoHeaders(key) {
+  return {
+    Authorization: `Klaviyo-API-Key ${key}`,
+    revision: "2025-10-15",
+    "Content-Type": "application/vnd.api+json",
+    Accept: "application/vnd.api+json",
+  };
+}
+
+function subscriptionJob(listId, profile) {
+  return {
+    data: {
+      type: "profile-subscription-bulk-create-job",
+      attributes: { custom_source: "Collector Coins panel", profiles: { data: [{ type: "profile", attributes: profile }] } },
+      relationships: { list: { data: { type: "list", id: listId } } },
+    },
+  };
+}
+
+/** Subscribe one customer to marketing emails and texts. Throws if Klaviyo refuses either. */
+export async function subscribeToAlerts({ email, phone }) {
+  const key = process.env.KLAVIYO_PRIVATE_KEY;
+  if (!key) throw new Error("KLAVIYO_PRIVATE_KEY is not set");
+  const jobs = [
+    subscriptionJob(process.env.KLAVIYO_EMAIL_LIST_ID || "RMifBt", {
+      email,
+      subscriptions: { email: { marketing: { consent: "SUBSCRIBED" } } },
+    }),
+    subscriptionJob(process.env.KLAVIYO_SMS_LIST_ID || "XMAWKx", {
+      email,
+      phone_number: phone,
+      subscriptions: { sms: { marketing: { consent: "SUBSCRIBED" } } },
+    }),
+  ];
+  for (const body of jobs) {
+    const res = await fetch(SUBSCRIBE_URL, { method: "POST", headers: klaviyoHeaders(key), body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`Klaviyo subscribe ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+}
+
+/** Whether the key can subscribe people (an empty job is refused with 400 if allowed, 401/403 if not). */
+export async function klaviyoCanSubscribe() {
+  const key = process.env.KLAVIYO_PRIVATE_KEY;
+  if (!key) return false;
+  try {
+    const res = await fetch(SUBSCRIBE_URL, {
+      method: "POST", headers: klaviyoHeaders(key), signal: AbortSignal.timeout(10_000),
+      body: JSON.stringify({ data: { type: "profile-subscription-bulk-create-job", attributes: { profiles: { data: [] } } } }),
+    });
+    return res.status !== 401 && res.status !== 403;
+  } catch {
+    return null;
+  }
+}

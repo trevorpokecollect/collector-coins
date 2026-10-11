@@ -1,6 +1,6 @@
 // What the storefront coin panel shows, built for one (possibly signed-out) visitor.
 import prisma from "../db.server";
-import { TIERS, tierByKey, nextTier, REVIEW_COINS, GOOGLE_REVIEW_COINS, COINS_PER_DOLLAR_OFF, EXPIRY_MONTHS, expiryDate, activePromotion } from "./rules";
+import { TIERS, tierByKey, nextTier, REVIEW_COINS, GOOGLE_REVIEW_COINS, ALERTS_SIGNUP_COINS, COINS_PER_DOLLAR_OFF, EXPIRY_MONTHS, expiryDate, activePromotion } from "./rules";
 import { customerIncluded, findOrCreateMember } from "./ledger.server";
 import { adminClient, getCustomer, listPrizes } from "./shopify.server";
 
@@ -39,7 +39,9 @@ export function programInfo() {
     tiers: TIERS.map((t) => ({
       key: t.key, name: t.name, threshold: t.threshold, earnRate: t.earnRate, birthdayCoins: t.birthdayCoins, reward: t.entry.title,
     })),
+    alertsCoins: ALERTS_SIGNUP_COINS,
     waysToEarn: [
+      { key: "alerts", title: "Drop & restock alerts", badge: `+${ALERTS_SIGNUP_COINS}`, detail: "Join our texts and emails to hear about new releases and restocks first." },
       { key: "purchase", title: "Shop with us", badge: "2-10 / $1", detail: "Coins on every online order. Higher tiers earn more per $1." },
       { key: "review", title: "Review a product", badge: `+${REVIEW_COINS}`, detail: "For each product you review." },
       { key: "google", title: "Google review", badge: `+${GOOGLE_REVIEW_COINS}`, detail: "Email your screenshot to support@poke-collect.com", url: "https://g.page/r/CRGYfzYI9zxTEAE/review" },
@@ -58,9 +60,10 @@ export async function panelState(member) {
   const state = { signedIn: Boolean(member), program: programInfo(), prizes };
   if (!member) return state;
 
-  const [rewards, activity] = await Promise.all([
+  const [rewards, activity, alerts] = await Promise.all([
     prisma.reward.findMany({ where: { memberId: member.id, code: { not: null }, revokedAt: null }, orderBy: { createdAt: "desc" }, take: 30 }),
     prisma.transaction.findMany({ where: { memberId: member.id }, orderBy: { createdAt: "desc" }, take: 25 }),
+    prisma.transaction.findUnique({ where: { idemKey: `alerts-signup:${member.id}` } }),
   ]);
   const tier = tierByKey(member.tier);
   state.member = {
@@ -71,6 +74,8 @@ export async function panelState(member) {
     tierName: tier.name,
     earnRate: tier.earnRate,
     next: nextTier(member.tier, member.lifetimeEarned),
+    email: member.email,
+    alertsClaimed: Boolean(alerts),
     birthday: member.birthdayMonth ? { month: member.birthdayMonth, day: member.birthdayDay } : null,
     expiresOn: member.balance > 0 ? expiryDate(member.lastActivityAt || new Date()).toISOString() : null,
     rewards: rewards.map((r) => ({ id: r.id, title: r.title, code: r.code, kind: r.kind, createdAt: r.createdAt })),

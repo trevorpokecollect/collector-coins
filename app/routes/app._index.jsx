@@ -6,6 +6,7 @@ import { programMode, testerTag, earnSources } from "../coins/ledger.server";
 import { tierByKey, formatCoins } from "../coins/rules";
 import { judgemeWebhookUrl, connectJudgeme } from "../coins/events.server";
 import { redemptionsByDay, checkRedemptionSpike, expiryStats } from "../coins/expiry.server";
+import { klaviyoCanSubscribe } from "../coins/klaviyo.server";
 import { formatMoney, EXPIRY_MONTHS } from "../coins/rules";
 
 export const loader = async ({ request }) => {
@@ -39,6 +40,7 @@ export const loader = async ({ request }) => {
     sources: earnSources().join(", "),
     judgeme: judgemeWebhookUrl(),
     klaviyo: Boolean(process.env.KLAVIYO_PRIVATE_KEY),
+    canSubscribe: await klaviyoCanSubscribe(),
     judgemeToken: Boolean(process.env.JUDGEME_API_TOKEN),
     days,
     spike,
@@ -60,7 +62,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Members() {
-  const { q, members, count, outstanding, mode, testerTag, sources, judgeme, klaviyo, judgemeToken, days, spike, expiry, alertEmail } = useLoaderData();
+  const { q, members, count, outstanding, mode, testerTag, sources, judgeme, klaviyo, canSubscribe, judgemeToken, days, spike, expiry, alertEmail } = useLoaderData();
   const result = useActionData();
   const busy = useNavigation().state !== "idle";
   return (
@@ -80,6 +82,14 @@ export default function Members() {
             discounts) · Orders that earn: {sources}
           </s-paragraph>
           <s-paragraph>Klaviyo events: {klaviyo ? "on" : "off (add KLAVIYO_PRIVATE_KEY in Railway)"}</s-paragraph>
+          <s-paragraph>
+            Text &amp; email alert sign-ups:{" "}
+            {canSubscribe === true
+              ? "ready"
+              : canSubscribe === false
+                ? "the Klaviyo key needs the \"Subscriptions: write\" and \"Lists: write\" scopes (Klaviyo → Settings → API keys)"
+                : "couldn't reach Klaviyo to check"}
+          </s-paragraph>
           {result?.ok && <s-banner tone="success">{result.ok}</s-banner>}
           {result?.error && <s-banner tone="critical">{result.error}</s-banner>}
           <s-paragraph>
