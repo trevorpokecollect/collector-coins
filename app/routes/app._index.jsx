@@ -39,7 +39,7 @@ export const loader = async ({ request }) => {
     testerTag: testerTag(),
     sources: earnSources().join(", "),
     judgeme: judgemeWebhookUrl(),
-    klaviyo: Boolean(process.env.KLAVIYO_PRIVATE_KEY),
+    klaviyo: Boolean(process.env.KLAVIYO_PRIVATE_KEY2 || process.env.KLAVIYO_PRIVATE_KEY),
     canSubscribe: await klaviyoCanSubscribe(),
     judgemeToken: Boolean(process.env.JUDGEME_API_TOKEN),
     days,

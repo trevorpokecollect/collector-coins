@@ -1,6 +1,11 @@
 // Sends Collector Coins events to Klaviyo so emails (earned, redeemed, tier reached) are Klaviyo flows.
 // Needs KLAVIYO_PRIVATE_KEY (a private API key with Events: write and Profiles: write). Without it, nothing is sent.
 
+/** The Klaviyo private key: KLAVIYO_PRIVATE_KEY2 (the key with sign-up scopes) if set, else KLAVIYO_PRIVATE_KEY. */
+export function klaviyoKey() {
+  return process.env.KLAVIYO_PRIVATE_KEY2 || process.env.KLAVIYO_PRIVATE_KEY || "";
+}
+
 export const METRICS = {
   earned: "Collector Coins Earned",
   spent: "Collector Coins Redeemed",
@@ -17,7 +22,7 @@ export const METRICS = {
  * take over 5 seconds, so a slow or down Klaviyo must never hold them up. A timeout or 5xx is retried once.
  */
 export function sendEvent(metric, member, properties = {}) {
-  const key = process.env.KLAVIYO_PRIVATE_KEY;
+  const key = klaviyoKey();
   if (!key || !member?.email) return;
   const body = {
     data: {
@@ -129,8 +134,8 @@ function subscriptionJob(listId, profile) {
 
 /** Subscribe one customer to marketing emails and texts. Throws if Klaviyo refuses either. */
 export async function subscribeToAlerts({ email, phone }) {
-  const key = process.env.KLAVIYO_PRIVATE_KEY;
-  if (!key) throw new Error("KLAVIYO_PRIVATE_KEY is not set");
+  const key = klaviyoKey();
+  if (!key) throw new Error("No Klaviyo private key is set");
   const jobs = [
     subscriptionJob(process.env.KLAVIYO_EMAIL_LIST_ID || "RMifBt", {
       email,
@@ -150,7 +155,7 @@ export async function subscribeToAlerts({ email, phone }) {
 
 /** Whether the key can subscribe people (an empty job is refused with 400 if allowed, 401/403 if not). */
 export async function klaviyoCanSubscribe() {
-  const key = process.env.KLAVIYO_PRIVATE_KEY;
+  const key = klaviyoKey();
   if (!key) return false;
   try {
     const res = await fetch(SUBSCRIBE_URL, {
