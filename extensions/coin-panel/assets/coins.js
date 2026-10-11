@@ -385,6 +385,78 @@
   }).observe(document.body, { attributes: true, childList: true, subtree: true, attributeFilter: ["class", "style", "open", "aria-hidden"] });
   setTimeout(avoidOverlap, 800);
 
+  // ---- phones: round quick-access button stacked just above the chat bubble ----
+  var fab = document.createElement("button");
+  fab.type = "button";
+  fab.className = "ccp-fab";
+  fab.setAttribute("aria-label", "Open Collector Coins");
+  fab.innerHTML = '<img src="' + esc(COIN) + '" alt=""><span class="ccp-fab-bal" hidden></span>';
+  document.body.appendChild(fab);
+  var $fabBal = fab.querySelector(".ccp-fab-bal");
+  fab.addEventListener("click", function () { root.classList.contains("ccp-open") ? close() : open("home"); });
+  function compact(x) {
+    x = Number(x || 0);
+    if (x < 1000) return String(x);
+    if (x < 10000) return (Math.floor(x / 100) / 10).toFixed(1).replace(/\.0$/, "") + "k";
+    if (x < 1000000) return Math.floor(x / 1000) + "k";
+    return (Math.floor(x / 100000) / 10).toFixed(1).replace(/\.0$/, "") + "m";
+  }
+  var baseUpdateLauncher = updateLauncher;
+  updateLauncher = function () {
+    baseUpdateLauncher();
+    if (state && state.member) { $fabBal.hidden = false; $fabBal.textContent = compact(state.member.balance); }
+  };
+  if (state) updateLauncher();
+  function visible(el) {
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8 || r.bottom <= 0 || r.top >= window.innerHeight) return null;
+    var cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) === 0) return null;
+    return r;
+  }
+  function placeFab() {
+    if (fab.offsetParent === null && getComputedStyle(fab).display === "none") return; // desktop: CSS hides it
+    var vh = window.innerHeight;
+    var hide = root.classList.contains("ccp-open");
+    // The chat window open (it slides up over the page) -> step aside.
+    var win = document.querySelector(".shop-ai-chat-window");
+    var wr = visible(win);
+    if (wr && wr.top < vh - 60) hide = true;
+    var bubble = visible(document.querySelector(".shop-ai-chat-bubble"));
+    var size = bubble ? Math.round(bubble.width) : 50;
+    var left = bubble ? Math.round(bubble.left) : 10;
+    var bottom = bubble ? Math.round(vh - bubble.top) + 12 : 10;
+    fab.style.width = fab.style.height = size + "px";
+    fab.style.left = left + "px";
+    fab.style.bottom = bottom + "px";
+    // Anything else fixed sitting where the button goes (cart drawer, menus, sticky add-to-cart bars)?
+    if (!hide) {
+      var top = vh - bottom - size, lift = 0;
+      var pts = [[left + size / 2, top + 4], [left + 4, top + size / 2], [left + size - 4, top + size / 2], [left + size / 2, top + size - 4], [left + size / 2, top + size / 2]];
+      pts.forEach(function (pt) {
+        document.elementsFromPoint(pt[0], pt[1]).forEach(function (el) {
+          if (el === fab || fab.contains(el) || root.contains(el) || el === document.body || el === document.documentElement) return;
+          if (el.closest && el.closest(".shop-ai-chat-container")) return;
+          var f = isFixed(el);
+          if (!f) return;
+          var fr = f.getBoundingClientRect();
+          if (fr.height > vh * 0.4) hide = true; // a drawer, menu or overlay: step aside
+          else lift = Math.max(lift, vh - fr.top);
+        });
+      });
+      if (lift && !hide) fab.style.bottom = Math.round(lift + 12) + "px";
+    }
+    fab.classList.toggle("ccp-fab-off", hide);
+  }
+  var fabTimer;
+  function schedulePlace() { clearTimeout(fabTimer); fabTimer = setTimeout(placeFab, 100); }
+  ["scroll", "resize", "click", "keyup", "orientationchange"].forEach(function (ev) { window.addEventListener(ev, schedulePlace, { passive: true }); });
+  new MutationObserver(function (records) {
+    if (records.some(function (rec) { return rec.target !== fab && !fab.contains(rec.target); })) schedulePlace();
+  }).observe(document.body, { attributes: true, childList: true, subtree: true, attributeFilter: ["class", "style", "open", "aria-hidden"] });
+  [300, 1200, 3000].forEach(function (t) { setTimeout(placeFab, t); });
+
   // ---- landing page: fill the rewards grid from live stock ----
   var grid = document.querySelector(".pc-cc #rewards .cc-rewards");
   if (grid) {
