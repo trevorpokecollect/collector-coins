@@ -79,7 +79,7 @@
     if (!m) {
       $head.innerHTML = '<button class="ccp-close" aria-label="Close">&times;</button><h2>Collector Coins</h2><p>Earn coins every time you shop, then trade them for free cards and discounts.</p>';
       $tabs.innerHTML = "";
-      $body.innerHTML = signedOut();
+      $body.innerHTML = promoBanner() + signedOut();
     } else {
       var next = m.next;
       var pct = next ? Math.max(0, Math.min(100, Math.round((100 * (m.lifetimeEarned - tierThreshold(m.tier))) / (next.threshold - tierThreshold(m.tier))))) : 100;
@@ -98,11 +98,20 @@
       if (view === "rewards") html += rewardsView(m);
       else if (view === "codes") html += codesView(m);
       else if (view === "activity") html += activityView(m);
-      else html += homeView(m);
+      else html += promoBanner() + homeView(m);
       $body.innerHTML = html;
     }
     var c = $head.querySelector(".ccp-close");
     if (c) c.addEventListener("click", close);
+  }
+
+  // A running coin promotion (e.g. 3x coins on Digital Mystery Packs), shown at the top of the Earn tab.
+  function promoBanner() {
+    var p = state && state.program && state.program.promotion;
+    if (!p || Date.now() >= Date.parse(p.endsAt)) return "";
+    return '<a class="ccp-promo" href="' + esc(p.url) + '"><span class="ccp-promo-x">' + esc(p.multiplier) + "x</span>" +
+      '<span class="ccp-grow"><span class="ccp-promo-t">' + esc(p.headline) + '</span><span class="ccp-d">' + esc(p.blurb) + " " + esc(p.endsText) + ".</span></span>" +
+      '<span class="ccp-promo-go" aria-hidden="true">&rsaquo;</span></a>';
   }
 
   function tierThreshold(key) {
@@ -276,6 +285,16 @@
   function copy(text) {
     if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function () {});
   }
+
+
+  // ---- page promo banners: <... data-ccp-promo data-starts="ISO" data-ends="ISO" style="display:none"> ----
+  (function () {
+    var now = Date.now();
+    document.querySelectorAll("[data-ccp-promo]").forEach(function (el) {
+      var s = Date.parse(el.getAttribute("data-starts") || ""), e = Date.parse(el.getAttribute("data-ends") || "");
+      if ((!s || now >= s) && e && now < e) el.style.display = "";
+    });
+  })();
 
   // ---- links: #coins-home, #coins-rewards, #coins-register, #coins-sign-in (and old #smile- links) ----
   var LINK_VIEWS = { home: "home", "points-activity-rules": "home", "points-balance": "home", redeem: "rewards", rewards: "rewards", "my-rewards": "codes", codes: "codes", activity: "activity", history: "activity" };

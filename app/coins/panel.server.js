@@ -1,6 +1,6 @@
 // What the storefront coin panel shows, built for one (possibly signed-out) visitor.
 import prisma from "../db.server";
-import { TIERS, tierByKey, nextTier, REVIEW_COINS, GOOGLE_REVIEW_COINS, COINS_PER_DOLLAR_OFF, EXPIRY_MONTHS, expiryDate } from "./rules";
+import { TIERS, tierByKey, nextTier, REVIEW_COINS, GOOGLE_REVIEW_COINS, COINS_PER_DOLLAR_OFF, EXPIRY_MONTHS, expiryDate, activePromotion } from "./rules";
 import { customerIncluded, findOrCreateMember } from "./ledger.server";
 import { adminClient, getCustomer, listPrizes } from "./shopify.server";
 
@@ -29,8 +29,12 @@ export async function memberForProxy(request) {
 }
 
 export function programInfo() {
+  const promo = activePromotion(new Date());
   return {
     coinsPerDollarOff: COINS_PER_DOLLAR_OFF,
+    promotion: promo
+      ? { id: promo.id, headline: promo.headline, blurb: promo.blurb, endsText: promo.endsText, endsAt: promo.endsAt, url: promo.url, multiplier: promo.multiplier }
+      : null,
     expiryMonths: EXPIRY_MONTHS,
     tiers: TIERS.map((t) => ({
       key: t.key, name: t.name, threshold: t.threshold, earnRate: t.earnRate, birthdayCoins: t.birthdayCoins, reward: t.entry.title,

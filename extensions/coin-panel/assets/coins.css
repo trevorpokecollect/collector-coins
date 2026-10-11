@@ -186,3 +186,12 @@ span.ccp-ticon-lg { font-size: 24px; }
   .ccp-head { padding-top: 16px; }
   .ccp-close { top: 10px; right: 10px; width: 36px; height: 36px; line-height: 36px; background: rgba(0,0,0,.28); }
 }
+
+/* Coin promotion banner (Earn tab and signed-out view) */
+.ccp-promo { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: var(--ccp-red, #e22f39); color: #fff !important; text-decoration: none !important; }
+.ccp-promo:hover { filter: brightness(1.05); }
+.ccp-promo-x { flex: 0 0 auto; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--ccp-yellow, #ffd800); color: #000; font: 700 22px/1 var(--ccp-display); }
+.ccp-promo .ccp-grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ccp-promo-t { font: 700 17px/1.1 var(--ccp-display); text-transform: uppercase; letter-spacing: .02em; color: #fff; }
+.ccp-promo .ccp-d { color: rgba(255,255,255,.9); }
+.ccp-promo-go { font-size: 28px; line-height: 1; opacity: .9; }

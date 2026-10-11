@@ -207,6 +207,11 @@ export const PROMOTIONS = [
     multiplier: 3,
     startsAt: "2026-10-11T19:00:00Z", // Oct 11, 2pm Central
     endsAt: "2026-10-19T05:00:00Z", // end of Sunday Oct 18, Central
+    // What the coin panel shows while it runs
+    headline: "3x Coins On Digital Mystery Packs",
+    blurb: "Every Digital Mystery Pack earns triple Collector Coins.",
+    endsText: "Ends Sunday, October 18",
+    url: "/collections/digital-mystery-packs",
   },
 ];
 
