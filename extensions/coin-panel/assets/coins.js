@@ -183,7 +183,7 @@
 
   // Text + email alerts sign-up: 200 coins, once per account.
   function alertsCard(m) {
-    if (m.alertsClaimed) return "";
+    if (m.alertsClaimed || !state.program.alertsEnabled) return "";
     var coins = n(state.program.alertsCoins || 200);
     return '<div class="ccp-card ccp-alerts">' +
       '<div class="ccp-earn-top">' + icon("alerts") + '<div class="ccp-grow"><div class="ccp-t">Never Miss A Drop</div>' +
