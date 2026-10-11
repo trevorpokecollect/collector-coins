@@ -85,6 +85,7 @@ model Reward {
   productId  String?
   idemKey    String?  @unique
   prevTier   String?  // for tier rewards: the tier the member was in before, so a refund can put them back
+  revokedAt  DateTime? // tier reward cancelled because a refund took the tier back (code kept for staff)
   createdAt  DateTime @default(now())
 
   @@index([memberId, createdAt])

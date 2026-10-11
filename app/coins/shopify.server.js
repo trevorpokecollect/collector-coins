@@ -196,7 +196,12 @@ export async function deactivateReward(admin, reward) {
 
 const ORDER_TOTALS = `#graphql
 query OrderTotals($id: ID!) {
-  order(id: $id) { subtotalPriceSet { shopMoney { amount } } totalTaxSet { shopMoney { amount } } }
+  order(id: $id) {
+    subtotalPriceSet { shopMoney { amount } }
+    currentSubtotalPriceSet { shopMoney { amount } }
+    totalTaxSet { shopMoney { amount } }
+    refunds(first: 50) { id }
+  }
 }`;
 
 /** An order's original subtotal and tax in cents, for working out the merchandise part of an amount-only refund. */
@@ -207,6 +212,8 @@ export async function getOrderTotals(admin, orderId) {
   return {
     subtotalCents: toCents(data.order.subtotalPriceSet?.shopMoney?.amount),
     taxCents: toCents(data.order.totalTaxSet?.shopMoney?.amount),
+    currentSubtotalCents: toCents(data.order.currentSubtotalPriceSet?.shopMoney?.amount),
+    refundCount: (data.order.refunds || []).length,
   };
 }
 

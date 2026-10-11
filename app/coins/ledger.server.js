@@ -170,7 +170,7 @@ export async function checkTier(memberId) {
   // A customer who jumps tiers gets the entry reward of the tier they land in.
   await issueTierEntry(updated, target, { prevTier: m.tier }).catch((e) => console.error(`Tier reward ${target.key} failed for ${m.customerId}`, e));
   const latest = await prisma.member.findUnique({ where: { id: memberId } });
-  await sendEvent(METRICS.tier, snapshot(latest), { tier: target.name, reward: target.entry.title, unique_id: `tier-${memberId}-${target.key}` });
+  await sendEvent(METRICS.tier, snapshot(latest), { tier: target.name, reward: target.entry.title, unique_id: `tier-${memberId}-${target.key}-${Date.now()}` });
   return latest;
 }
 
@@ -212,6 +212,8 @@ export async function issueTierEntry(member, tier, { prevTier = null } = {}) {
           } catch (err) {
             // Attaching a gift card to a customer needs write_customers, which the app doesn't have.
             // An unattached gift card works the same at checkout (balance carries over, covers shipping/tax).
+            // Only retry for that refusal: after a timeout the first card may already exist.
+            if (!/permission|access denied/i.test(err.message || "")) throw err;
             try {
               made = await createGiftCard(admin, {
                 amountCents: entry.giftCardCents,
@@ -264,57 +266,79 @@ export async function issueTierEntry(member, tier, { prevTier = null } = {}) {
  * After a refund lowers lifetime coins: take away any tier the member no longer qualifies for, if it was reached
  * in the last TIER_REVOKE_DAYS (so refunding the order that unlocked a tier doesn't keep its rewards). The tier's
  * gift card or code is switched off and its bonus coins taken back. Tiers held longer than that, or brought over
- * from Smile, never drop. Returns the tier keys taken away.
+ * from Smile, never drop. Each tier's reward pays out once ever: reaching a revoked tier again restores the tier
+ * and its earn rate but issues no second gift card or bonus. Returns the tier keys taken away.
  */
 export async function revokeTiersAfterRefund(memberId, { now = new Date() } = {}) {
   const since = new Date(now.getTime() - TIER_REVOKE_DAYS * 24 * 60 * 60 * 1000);
   const revoked = [];
-  let admin;
+  const toSwitchOff = [];
   for (let guard = 0; guard < TIERS.length; guard++) {
     const m = await prisma.member.findUnique({ where: { id: memberId } });
     if (!m) break;
     const cur = tierIndex(m.tier);
-    const qualifies = tierIndex(tierForLifetime(m.lifetimeEarned).key);
-    if (cur === 0 || cur <= qualifies) break;
+    if (cur === 0) break;
     const tier = TIERS[cur];
     const reward = await prisma.reward.findUnique({ where: { idemKey: `tier:${m.id}:${tier.key}` } });
     const bonus = await prisma.transaction.findUnique({ where: { idemKey: `tierbonus:${m.id}:${tier.key}` } });
+    const bonusTakenBack = bonus
+      ? Boolean(await prisma.transaction.findUnique({ where: { idemKey: `tierbonus-revoke:${bonus.id}` } }))
+      : true;
+    // Judge the tier without its own bonus: those coins only exist because of the tier.
+    const lifetimeWithoutBonus = Math.max(0, m.lifetimeEarned - (bonusTakenBack ? 0 : bonus.amount));
+    const qualifies = tierIndex(tierForLifetime(lifetimeWithoutBonus).key);
+    if (cur <= qualifies) break;
+
     const reachedAt = reward?.createdAt || bonus?.createdAt;
     if (!reachedAt || reachedAt < since) break; // reached long ago, or carried over from Smile: keep it
+    if (!reward?.prevTier && m.importedFromSmile) break; // reached before we recorded the prior tier: can't tell its Smile tier
 
-    // Where they land: what their lifetime coins qualify for once this tier's own bonus is gone, but never
-    // below the tier they held before reaching this one.
-    const lifetimeWithoutBonus = Math.max(0, m.lifetimeEarned - (bonus?.amount || 0));
-    const qualifiesAfter = tierIndex(tierForLifetime(lifetimeWithoutBonus).key);
-    const back = TIERS[Math.min(cur - 1, Math.max(qualifiesAfter, reward?.prevTier ? tierIndex(reward.prevTier) : 0))];
-    const moved = await prisma.member.updateMany({ where: { id: m.id, tier: tier.key }, data: { tier: back.key } });
-    if (moved.count !== 1) continue; // another refund got here first; look again
-
-    if (reward) {
-      if (reward.code) {
-        admin = admin || (await adminClient());
-        await deactivateReward(admin, reward).catch((e) => console.error(`Could not switch off ${reward.code}`, e.message));
+    const back = TIERS[Math.min(cur - 1, Math.max(qualifies, reward?.prevTier ? tierIndex(reward.prevTier) : 0))];
+    const switchOff = Boolean(reward?.code && !reward.revokedAt);
+    const done = await prisma.$transaction(async (tx) => {
+      const moved = await tx.member.updateMany({ where: { id: m.id, tier: tier.key }, data: { tier: back.key } });
+      if (moved.count !== 1) return false; // another refund got here first
+      if (reward && !reward.revokedAt) {
+        await tx.reward.update({
+          where: { id: reward.id },
+          data: { revokedAt: now, title: `${reward.title} (cancelled after refund)` },
+        });
       }
-      await prisma.reward.update({
-        where: { id: reward.id },
-        data: {
-          idemKey: `revoked:${reward.id}`, // frees the tier so reaching it again issues a new reward
-          code: null,
-          title: `${reward.title} (cancelled after refund${reward.code ? `, was ${reward.code}` : ""})`,
-        },
-      });
-    }
-    if (bonus) {
-      await prisma.transaction.update({ where: { id: bonus.id }, data: { idemKey: `revoked:${bonus.id}` } });
-      await takeBack(m, {
-        amount: bonus.amount,
-        kind: "tier_bonus_revoked",
-        description: `${tier.name} bonus taken back after a refund`,
-        idemKey: `tierbonus-revoke:${bonus.id}`,
-      });
-    }
+      if (bonus && !bonusTakenBack) {
+        const fresh = await tx.member.findUnique({ where: { id: m.id } });
+        const taken = Math.min(bonus.amount, fresh.balance);
+        await tx.transaction.create({
+          data: {
+            memberId: m.id, amount: -taken, kind: "tier_bonus_revoked",
+            description: `${tier.name} bonus taken back after a refund`, idemKey: `tierbonus-revoke:${bonus.id}`,
+          },
+        });
+        await tx.member.update({
+          where: { id: m.id },
+          data: { balance: { decrement: taken }, lifetimeEarned: Math.max(0, fresh.lifetimeEarned - bonus.amount) },
+        });
+      }
+      return true;
+    });
+    if (!done) continue;
+    if (switchOff) toSwitchOff.push(reward);
     console.log(`Tier ${tier.key} taken back from member ${m.customerId} after a refund (now ${back.key})`);
     revoked.push(tier.key);
+  }
+
+  if (toSwitchOff.length) {
+    const admin = await adminClient();
+    for (const reward of toSwitchOff) {
+      await deactivateReward(admin, reward).catch((e) =>
+        console.error(`SWITCH OFF BY HAND: could not deactivate ${reward.code} (${reward.title}) for member ${memberId}: ${e.message}`),
+      );
+    }
+  }
+  if (revoked.length) {
+    const latest = await prisma.member.findUnique({ where: { id: memberId } });
+    sendEvent(METRICS.adjusted, snapshot(latest), {
+      reason: "tier_taken_back_after_refund", tiers: revoked, unique_id: `tier-revoke-${memberId}-${now.getTime()}`,
+    });
   }
   return revoked;
 }

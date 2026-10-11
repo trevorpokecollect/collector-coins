@@ -55,7 +55,7 @@ export async function panelState(member) {
   if (!member) return state;
 
   const [rewards, activity] = await Promise.all([
-    prisma.reward.findMany({ where: { memberId: member.id, code: { not: null } }, orderBy: { createdAt: "desc" }, take: 30 }),
+    prisma.reward.findMany({ where: { memberId: member.id, code: { not: null }, revokedAt: null }, orderBy: { createdAt: "desc" }, take: 30 }),
     prisma.transaction.findMany({ where: { memberId: member.id }, orderBy: { createdAt: "desc" }, take: 25 }),
   ]);
   const tier = tierByKey(member.tier);

@@ -125,3 +125,19 @@ test("refunded merchandise: items, gift cards, and amount-only refunds", () => {
   assert.equal(refundedMerchCents({ transactions: [{ kind: "refund", status: "failure", amount: "10.00" }] }, null), 0);
   assert.ok(TIER_REVOKE_DAYS >= 30);
 });
+
+test("amount-only refunds: newer shipping lines, pending refunds, shop currency", () => {
+  const order = { subtotalCents: 10000, taxCents: 0 };
+  // Shipping-only refund reported as refund_shipping_lines takes nothing back
+  assert.equal(refundedMerchCents({
+    refund_line_items: [],
+    transactions: [{ kind: "refund", status: "success", amount: "8.00" }],
+    refund_shipping_lines: [{ subtotal_amount_set: { shop_money: { amount: "8.00" } } }],
+  }, order), 0);
+  // A pending refund (PayPal) still counts
+  assert.equal(refundedMerchCents({ transactions: [{ kind: "refund", status: "pending", amount: "20.00" }] }, order), 2000);
+  // Shop-currency amount preferred over the presentment amount
+  assert.equal(refundedMerchCents({
+    transactions: [{ kind: "refund", status: "success", amount: "27.00", amount_set: { shop_money: { amount: "20.00" } } }],
+  }, order), 2000);
+});

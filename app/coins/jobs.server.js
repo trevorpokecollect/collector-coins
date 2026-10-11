@@ -2,12 +2,13 @@
 // - birthday coins (once per member per year)
 // - coin expiry warnings and expiry (once a day, from 10am store time)
 // - redemption spike alert (at most one alert a day)
-import { runBirthdays } from "./events.server";
+// - Judge.me review catch-up (once a day, and once shortly after each start)
+import { runBirthdays, runReviewSweep } from "./events.server";
 import { runExpiry, checkRedemptionSpike } from "./expiry.server";
 import { monthDayInZone } from "./rules";
 
 const HOUR = 60 * 60 * 1000;
-const state = (globalThis.__coinsJobs ||= { started: false, expiryDay: null });
+const state = (globalThis.__coinsJobs ||= { started: false, expiryDay: null, reviewDay: null });
 
 function chicagoHour(now) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", hour12: false }).format(now)) % 24;
@@ -30,6 +31,15 @@ async function tick() {
       if (r.warned || r.expired) console.log(`Expiry: ${r.warned} warned, ${r.expired} expired`);
     } catch (e) {
       console.error("Expiry job failed", e);
+    }
+  }
+  if (state.reviewDay !== dayKey) {
+    state.reviewDay = dayKey;
+    try {
+      const r = await runReviewSweep({ now });
+      if (r.checked) console.log(`Review catch-up: ${r.checked} recent reviews checked, ${r.paid} paid`);
+    } catch (e) {
+      console.error("Review catch-up failed", e);
     }
   }
   try {

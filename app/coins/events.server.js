@@ -1,7 +1,7 @@
 // What happens when Shopify or Judge.me tells us something: orders paid, refunds, new customers, reviews, birthdays.
 import { createHmac } from "node:crypto";
 import prisma from "../db.server";
-import { orderEarns, purchaseCoins, refundCoins, tierByKey, REVIEW_COINS, monthDayInZone, birthdayCoinsDue, earnableSubtotalCents, refundedMerchCents } from "./rules";
+import { orderEarns, purchaseCoins, refundCoins, toCents, tierByKey, REVIEW_COINS, MAX_REVIEW_REWARDS, monthDayInZone, birthdayCoinsDue, earnableSubtotalCents, refundedMerchCents } from "./rules";
 import { customerIncluded, earnSources, findOrCreateMember, credit, takeBack, revokeTiersAfterRefund } from "./ledger.server";
 import { adminClient, findCustomersByEmail, getCustomer, getOrderTotals, customerBoughtProduct } from "./shopify.server";
 
@@ -33,7 +33,14 @@ export async function handleOrderPaid(order) {
 
   const member = await findOrCreateMember(customer);
   const rate = tierByKey(member.tier).earnRate;
-  const subtotalCents = earnableSubtotalCents(order);
+  let subtotalCents = earnableSubtotalCents(order);
+  // If a refund landed before this paid notice was handled (delayed or retried webhook), the payload predates it
+  // and the refund webhook was skipped. Earn on what's left of the order now instead.
+  const now = await getOrderTotals(await adminClient(), order.id).catch(() => null);
+  if (now && now.refundCount > (order.refunds || []).length) {
+    const giftCardPart = Math.max(0, toCents(order.current_subtotal_price ?? order.subtotal_price) - subtotalCents);
+    subtotalCents = Math.min(subtotalCents, Math.max(0, now.currentSubtotalCents - giftCardPart));
+  }
   const coins = purchaseCoins(subtotalCents, rate);
   if (!coins) return { skipped: "no coins" };
   const txn = await credit(member, {
@@ -88,7 +95,8 @@ export async function handleCustomer(payload, { create }) {
 }
 
 /**
- * Judge.me review/created: 100 coins to the reviewer for a product they bought, once per product per customer.
+ * Judge.me review/created: 100 coins to the reviewer for a product they bought, paid when the review is written
+ * (not when staff approve it), once per product and at most MAX_REVIEW_REWARDS reviews per account.
  * Reviews Judge.me marks as spam, and reviews of products the customer hasn't bought, earn nothing.
  * Payload shape varies by Judge.me version, so the fields are read defensively.
  */
@@ -99,7 +107,7 @@ export async function handleReview(body) {
   const productKey = String(review.product_external_id || review.product_id || review.product_handle || "");
   if (!email || !reviewId) return { skipped: "no email or review id" };
   if (!productKey) return { skipped: "no product on the review" };
-  if (review.curated === "spam" || review.hidden === true) return { skipped: "spam or hidden review" };
+  if (String(review.curated || "").toLowerCase() === "spam") return { skipped: "spam review" };
 
   const admin = await adminClient();
   const found = await findCustomersByEmail(admin, [email]);
@@ -115,6 +123,8 @@ export async function handleReview(body) {
   const member = await findOrCreateMember(customer);
   const dupe = await prisma.transaction.findUnique({ where: { idemKey: `review-product:${member.id}:${productKey}` } });
   if (dupe) return { skipped: "already rewarded for this product" };
+  const paidSoFar = await prisma.transaction.count({ where: { memberId: member.id, kind: "review" } });
+  if (paidSoFar >= MAX_REVIEW_REWARDS) return { skipped: `already earned for ${MAX_REVIEW_REWARDS} reviews` };
   const txn = await credit(member, {
     amount: REVIEW_COINS,
     kind: "review",
@@ -122,6 +132,40 @@ export async function handleReview(body) {
     idemKey: `review-product:${member.id}:${productKey}`,
   });
   return { coins: txn ? REVIEW_COINS : 0 };
+}
+
+/**
+ * Daily catch-up: pay any recent Judge.me reviews the webhook missed (app restarts, Judge.me outages, or the
+ * Oct 10-11 bug that skipped reviews awaiting approval). Goes through the same checks as the webhook and is
+ * safe to repeat: each product review pays once.
+ */
+export async function runReviewSweep({ days = 14, now = new Date() } = {}) {
+  const token = process.env.JUDGEME_API_TOKEN;
+  if (!token) return { checked: 0, paid: 0 };
+  const since = now.getTime() - days * 24 * 60 * 60 * 1000;
+  let checked = 0, paid = 0;
+  for (let page = 1; page <= 5; page++) {
+    const qs = new URLSearchParams({ api_token: token, shop_domain: process.env.SHOP || "poke-collect-al.myshopify.com", per_page: "100", page: String(page) });
+    const res = await fetch(`https://judge.me/api/v1/reviews?${qs}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`Judge.me reviews ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const reviews = (await res.json()).reviews || [];
+    let older = false;
+    for (const review of reviews) {
+      if (new Date(review.created_at).getTime() < since) { older = true; continue; }
+      checked++;
+      const email = (review.reviewer?.email || review.email || "").trim().toLowerCase();
+      const productKey = String(review.product_external_id || review.product_id || review.product_handle || "");
+      if (email && productKey) {
+        const member = await prisma.member.findFirst({ where: { email } });
+        if (member && (await prisma.transaction.findUnique({ where: { idemKey: `review-product:${member.id}:${productKey}` } }))) continue;
+      }
+      const r = await handleReview({ review }).catch((e) => ({ error: e.message }));
+      if (r.coins) paid++;
+      if (r.coins || r.error) console.log(`Review sweep ${review.id}: ${JSON.stringify(r)}`);
+    }
+    if (older || reviews.length < 100) break;
+  }
+  return { checked, paid };
 }
 
 /** Daily: birthday coins for Ultra and Master Ball members, once a year. */

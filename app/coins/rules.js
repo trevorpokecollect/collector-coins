@@ -38,6 +38,7 @@ export const TIERS = [
 ];
 
 export const REVIEW_COINS = 100;
+export const MAX_REVIEW_REWARDS = 3; // product reviews that earn coins, per account, ever
 export const GOOGLE_REVIEW_COINS = 500;
 export const COINS_PER_DOLLAR_OFF = 250; // order discount: 250 coins = $1 off
 export const PRIZE_COINS_PER_DOLLAR = 200; // free product: retail price x 200 coins
@@ -170,13 +171,21 @@ export function earnableSubtotalCents(order) {
 export function refundedMerchCents(refund, order) {
   const items = (refund.refund_line_items || []).filter((rli) => !rli.line_item?.gift_card);
   if ((refund.refund_line_items || []).length) return items.reduce((sum, rli) => sum + toCents(rli.subtotal), 0);
+  const shopAmount = (x) => x?.amount_set?.shop_money?.amount ?? x?.amount;
+  // Pending counts too (PayPal, Shop Pay Installments): the refund webhook doesn't fire again when it settles.
   const moneyBack = (refund.transactions || [])
-    .filter((t) => t.kind === "refund" && t.status === "success")
-    .reduce((sum, t) => sum + toCents(t.amount), 0);
-  const shipping = (refund.order_adjustments || [])
+    .filter((t) => t.kind === "refund" && (t.status === "success" || t.status === "pending"))
+    .reduce((sum, t) => sum + toCents(shopAmount(t)), 0);
+  // Shipping refunds arrive as order adjustments (older API versions) or refund_shipping_lines (newer ones).
+  const shippingAdjustments = (refund.order_adjustments || [])
     .filter((a) => a.kind === "shipping_refund")
     .reduce((sum, a) => sum + Math.abs(toCents(a.amount)) + Math.abs(toCents(a.tax_amount)), 0);
-  const merchWithTax = Math.max(0, moneyBack - shipping);
+  const shippingLines = (refund.refund_shipping_lines || []).reduce((sum, l) => {
+    const sub = l.subtotal_amount_set?.shop_money?.amount ?? l.subtotal_amount ?? l.amount;
+    const tax = l.tax_amount_set?.shop_money?.amount ?? l.tax_amount ?? 0;
+    return sum + Math.abs(toCents(sub)) + Math.abs(toCents(tax));
+  }, 0);
+  const merchWithTax = Math.max(0, moneyBack - Math.max(shippingAdjustments, shippingLines));
   if (!order || order.subtotalCents <= 0) return merchWithTax;
   return Math.floor((merchWithTax * order.subtotalCents) / (order.subtotalCents + Math.max(0, order.taxCents)));
 }
