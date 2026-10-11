@@ -1,5 +1,6 @@
 // One member: balance, tier, codes, history, and the staff Adjust coins form (Google reviews, fixes, goodwill).
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
+import { useState } from "react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { credit, takeBack } from "../coins/ledger.server";
@@ -55,6 +56,22 @@ export const action = async ({ request, params }) => {
   return { ok: `Removed ${formatCoins(taken)} coins${taken < -amount ? " (balance can't go below zero)" : ""}.` };
 };
 
+// Common reasons for the Adjust coins form. Picking one fills the amount and reason; both can still be edited.
+// The reason is shown to the customer in their coin history.
+const PRESETS = [
+  { id: "", label: "Choose a common reason…", coins: "", reason: "", tier: true },
+  { id: "google", label: "Google review (500)", coins: String(GOOGLE_REVIEW_COINS), reason: "Google Review", tier: true },
+  { id: "missed", label: "Coins missing from an order", coins: "", reason: "Coins For Order #", tier: true },
+  { id: "sorry", label: "Sorry for the trouble (goodwill)", coins: "", reason: "Sorry For The Trouble", tier: false },
+  { id: "giveaway", label: "Giveaway prize", coins: "", reason: "Giveaway Prize", tier: false },
+  { id: "live", label: "Live show bonus", coins: "", reason: "Live Show Bonus", tier: false },
+  { id: "bonus", label: "Thank-you bonus", coins: "", reason: "Thank You Bonus", tier: false },
+  { id: "fix", label: "Correction (remove coins)", coins: "-", reason: "Balance Correction", tier: false },
+  { id: "other", label: "Other (type your own)", coins: "", reason: "", tier: true },
+];
+
+const selectStyle = { padding: "6px 8px", borderRadius: 8, border: "1px solid #8a8a8a", font: "inherit", background: "#fff", maxWidth: 360 };
+
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export default function MemberPage() {
@@ -63,6 +80,9 @@ export default function MemberPage() {
   const nav = useNavigation();
   const busy = nav.state !== "idle";
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email || `Customer ${m.customerId}`;
+  const [presetId, setPresetId] = useState("");
+  const preset = PRESETS.find((p) => p.id === presetId) || PRESETS[0];
+  const googleBefore = m.transactions.find((t) => t.amount > 0 && /google review/i.test(t.description));
 
   return (
     <s-page heading={name}>
@@ -83,12 +103,24 @@ export default function MemberPage() {
       </s-section>
 
       <s-section heading="Adjust coins">
-        <Form method="post">
+        <Form method="post" key={`adjust-${m.transactions.length}`}>
           <input type="hidden" name="intent" value="adjust" />
           <s-stack gap="base">
-            <s-number-field name="amount" label="Coins (negative to remove)" placeholder={String(GOOGLE_REVIEW_COINS)}></s-number-field>
-            <s-text-field name="reason" label="Reason (the customer sees this)" placeholder="Google review"></s-text-field>
-            <s-checkbox name="countsToTier" label="Counts toward their tier" checked></s-checkbox>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontWeight: 500 }}>Common reasons</span>
+              <select value={preset.id} onChange={(e) => setPresetId(e.target.value)} style={selectStyle}>
+                {PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            </label>
+            {preset.id === "google" && googleBefore && (
+              <s-banner tone="warning">This customer already got Google review coins on {new Date(googleBefore.createdAt).toLocaleDateString()}.</s-banner>
+            )}
+            {/* Keyed on the preset so picking one resets the fields to its values */}
+            <s-number-field key={`amount-${preset.id}`} name="amount" label="Coins (negative to remove)" value={preset.coins === "-" ? "" : preset.coins} placeholder={preset.coins === "-" ? "-200" : "500"}></s-number-field>
+            <s-text-field key={`reason-${preset.id}`} name="reason" label="Reason (the customer sees this)" value={preset.reason} placeholder="Google Review"></s-text-field>
+            <s-checkbox key={`tier-${preset.id}`} name="countsToTier" label="Counts toward their tier" checked={preset.tier || undefined}></s-checkbox>
             <s-button type="submit" variant="primary" loading={busy || undefined}>Save</s-button>
           </s-stack>
         </Form>
