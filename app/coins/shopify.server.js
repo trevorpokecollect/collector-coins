@@ -217,6 +217,28 @@ export async function getOrderTotals(admin, orderId) {
   };
 }
 
+const PRODUCTS_OF_TYPE = `#graphql
+query ProductsOfType($q: String!, $after: String) {
+  products(first: 250, query: $q, after: $after) { nodes { id } pageInfo { hasNextPage endCursor } }
+}`;
+const typeCache = new Map();
+
+/** Ids of every product with this product type (any status), cached for 10 minutes. */
+export async function productIdsOfType(admin, productType) {
+  const hit = typeCache.get(productType);
+  if (hit && hit.at > Date.now() - 10 * 60 * 1000) return hit.ids;
+  const ids = new Set();
+  let after = null;
+  for (let page = 0; page < 20; page++) {
+    const data = await gql(admin, PRODUCTS_OF_TYPE, { q: `product_type:'${productType.replace(/'/g, "\\'")}'`, after });
+    for (const p of data.products.nodes) ids.add(numericId(p.id));
+    if (!data.products.pageInfo.hasNextPage) break;
+    after = data.products.pageInfo.endCursor;
+  }
+  typeCache.set(productType, { at: Date.now(), ids });
+  return ids;
+}
+
 const CUSTOMER_ORDERS = `#graphql
 query CustomerOrders($q: String!) {
   orders(first: 50, query: $q, sortKey: CREATED_AT, reverse: true) {

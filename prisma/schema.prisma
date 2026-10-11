@@ -64,6 +64,7 @@ model Transaction {
   earnRate    Int?     // coins per $1 used for a purchase, reused when a refund takes coins back
   countsToTier Boolean @default(true)
   idemKey     String?  @unique // stops a webhook delivered twice from paying twice
+  meta        Json?    // purchase: coin promotion applied ({ promo, lineItemIds, promoCents, earnableCents, extraRate })
   staff       String?
   createdAt   DateTime @default(now())
 

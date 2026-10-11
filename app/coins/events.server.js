@@ -1,9 +1,9 @@
 // What happens when Shopify or Judge.me tells us something: orders paid, refunds, new customers, reviews, birthdays.
 import { createHmac } from "node:crypto";
 import prisma from "../db.server";
-import { orderEarns, purchaseCoins, refundCoins, toCents, tierByKey, REVIEW_COINS, MAX_REVIEW_REWARDS, monthDayInZone, birthdayCoinsDue, earnableSubtotalCents, refundedMerchCents } from "./rules";
+import { orderEarns, purchaseCoins, refundCoinsWithPromo, promoRefundCents, toCents, tierByKey, activePromotion, promoLines, promoBonusCoins, REVIEW_COINS, MAX_REVIEW_REWARDS, monthDayInZone, birthdayCoinsDue, earnableSubtotalCents, refundedMerchCents } from "./rules";
 import { customerIncluded, earnSources, findOrCreateMember, credit, takeBack, revokeTiersAfterRefund } from "./ledger.server";
-import { adminClient, findCustomersByEmail, getCustomer, getOrderTotals, customerBoughtProduct } from "./shopify.server";
+import { adminClient, findCustomersByEmail, getCustomer, getOrderTotals, customerBoughtProduct, productIdsOfType } from "./shopify.server";
 
 function customerFromPayload(c) {
   return {
@@ -41,17 +41,38 @@ export async function handleOrderPaid(order) {
     const giftCardPart = Math.max(0, toCents(order.current_subtotal_price ?? order.subtotal_price) - subtotalCents);
     subtotalCents = Math.min(subtotalCents, Math.max(0, now.currentSubtotalCents - giftCardPart));
   }
-  const coins = purchaseCoins(subtotalCents, rate);
+  let coins = purchaseCoins(subtotalCents, rate);
+  let description = `Order ${order.name || "#" + order.order_number}`;
+  let meta = null;
+
+  // Coin promotion (e.g. 3x on Mystery Packs) for orders placed while it runs.
+  const promo = activePromotion(order.processed_at || order.created_at || new Date());
+  if (promo) {
+    const ids = await productIdsOfType(await adminClient(), promo.productType).catch((e) => {
+      console.error(`Promotion ${promo.id}: product lookup failed`, e.message);
+      return new Set();
+    });
+    const lines = promoLines(order, ids);
+    const cents = Math.min(lines.cents, subtotalCents);
+    const bonus = promoBonusCoins(cents, rate, promo.multiplier);
+    if (bonus > 0) {
+      coins += bonus;
+      description += ` (includes ${promo.title})`;
+      meta = { promo: promo.id, multiplier: promo.multiplier, lineItemIds: lines.lineItemIds, promoCents: cents, earnableCents: subtotalCents, extraRate: rate * (promo.multiplier - 1), bonus };
+    }
+  }
+
   if (!coins) return { skipped: "no coins" };
   const txn = await credit(member, {
     amount: coins,
     kind: "purchase",
-    description: `Order ${order.name || "#" + order.order_number}`,
+    description,
     orderId: String(order.id),
     earnRate: rate,
     idemKey: `order:${order.id}`,
+    meta,
   });
-  return { coins: txn ? coins : 0 };
+  return { coins: txn ? coins : 0, ...(meta ? { promoBonus: meta.bonus } : {}) };
 }
 
 /**
@@ -69,7 +90,10 @@ export async function handleRefund(refund) {
   const refundedCents = refundedMerchCents(refund, totals);
   const prior = await prisma.transaction.aggregate({ where: { orderId, kind: "refund" }, _sum: { amount: true } });
   const alreadyTakenBack = -(prior._sum.amount || 0);
-  const coins = refundCoins(refundedCents, earned.earnRate || tierByKey(member.tier).earnRate, earned.amount, alreadyTakenBack);
+  const promoCents = promoRefundCents(refund, earned.meta, refundedCents);
+  const coins = refundCoinsWithPromo(
+    refundedCents, earned.earnRate || tierByKey(member.tier).earnRate, promoCents, earned.meta?.extraRate, earned.amount, alreadyTakenBack,
+  );
   if (!coins) return { skipped: "nothing to take back" };
   const taken = await takeBack(member, {
     amount: coins,

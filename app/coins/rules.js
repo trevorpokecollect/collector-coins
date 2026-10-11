@@ -196,6 +196,68 @@ export function refundedMerchCents(refund, order) {
   return Math.floor((merchWithTax * order.subtotalCents) / (order.subtotalCents + Math.max(0, order.taxCents)));
 }
 
+// ---- coin promotions ------------------------------------------------------------------------------
+// Extra coins on certain products for a set time. Matched by Shopify product type, so new products of that type
+// are included automatically. Times are UTC; the order's own time decides whether it counts.
+export const PROMOTIONS = [
+  {
+    id: "mystery-packs-3x-2026-10",
+    title: "3x Coins On Mystery Packs",
+    productType: "Mystery Pack",
+    multiplier: 3,
+    startsAt: "2026-10-11T19:00:00Z", // Oct 11, 2pm Central
+    endsAt: "2026-10-19T05:00:00Z", // end of Sunday Oct 18, Central
+  },
+];
+
+export function activePromotion(at, promotions = PROMOTIONS) {
+  const t = new Date(at).getTime();
+  return promotions.find((p) => t >= Date.parse(p.startsAt) && t < Date.parse(p.endsAt)) || null;
+}
+
+/** The order's line items for products in `productIds`: their subtotal after discounts, and their ids. */
+export function promoLines(order, productIds) {
+  let cents = 0;
+  const lineItemIds = [];
+  for (const li of order.line_items || []) {
+    if (li.gift_card || !productIds.has(String(li.product_id))) continue;
+    const qty = li.current_quantity ?? li.quantity ?? 0;
+    const c = Math.max(0, toCents(li.price) * qty - lineDiscountCents(li));
+    if (c > 0) {
+      cents += c;
+      lineItemIds.push(String(li.id));
+    }
+  }
+  return { cents, lineItemIds };
+}
+
+/** Extra coins a promotion adds on top of the normal rate (3x = 2 extra rates). */
+export function promoBonusCoins(promoCents, earnRate, multiplier) {
+  if (promoCents <= 0 || multiplier <= 1) return 0;
+  return Math.floor((promoCents * earnRate * (multiplier - 1)) / 100);
+}
+
+/**
+ * The promotion part of a refund: refunded promo items (item refunds), or the promo share of an amount-only refund.
+ * `meta` is what the purchase stored when the promotion applied.
+ */
+export function promoRefundCents(refund, meta, refundedCents) {
+  if (!meta?.promo || !meta.promoCents) return 0;
+  const lines = refund.refund_line_items || [];
+  if (lines.length) {
+    const ids = new Set((meta.lineItemIds || []).map(String));
+    return lines.filter((rli) => ids.has(String(rli.line_item_id ?? rli.line_item?.id))).reduce((s, rli) => s + toCents(rli.subtotal), 0);
+  }
+  if (!meta.earnableCents) return 0;
+  return Math.floor((refundedCents * meta.promoCents) / meta.earnableCents);
+}
+
+/** Coins to take back including a promotion's extra rate, never more than the order has left. */
+export function refundCoinsWithPromo(refundedCents, earnRate, promoCents, extraRate, earnedOnOrder, alreadyTakenBack) {
+  const want = Math.ceil((Math.max(0, refundedCents) * earnRate) / 100) + Math.ceil((Math.max(0, promoCents) * (extraRate || 0)) / 100);
+  return Math.min(want, Math.max(0, earnedOnOrder - alreadyTakenBack));
+}
+
 /** A tier reached this recently can be taken away if a refund drops the member's lifetime coins below it. */
 export const TIER_REVOKE_DAYS = 60;
 

@@ -71,13 +71,13 @@ export async function findOrCreateMember(customer, { welcome = true } = {}) {
  * Add coins. Returns the transaction, or null when idemKey was already used (a repeated webhook).
  * Checks for a tier upgrade afterwards.
  */
-export async function credit(member, { amount, kind, description, orderId, earnRate, idemKey, countsToTier = true, staff, notify = true }) {
+export async function credit(member, { amount, kind, description, orderId, earnRate, idemKey, countsToTier = true, staff, notify = true, meta }) {
   if (!amount || amount <= 0) return null;
   let txn;
   try {
     txn = await prisma.$transaction(async (tx) => {
       const t = await tx.transaction.create({
-        data: { memberId: member.id, amount, kind, description, orderId, earnRate, idemKey, countsToTier, staff },
+        data: { memberId: member.id, amount, kind, description, orderId, earnRate, idemKey, countsToTier, staff, ...(meta ? { meta } : {}) },
       });
       await tx.member.update({
         where: { id: member.id },

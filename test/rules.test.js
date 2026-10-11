@@ -150,3 +150,38 @@ test("amount-only refunds: newer shipping lines, pending refunds, shop currency"
     transactions: [{ kind: "refund", status: "success", amount: "27.00", amount_set: { shop_money: { amount: "20.00" } } }],
   }, order), 2000);
 });
+
+import { activePromotion, promoLines, promoBonusCoins, promoRefundCents, refundCoinsWithPromo, PROMOTIONS } from "../app/coins/rules.js";
+
+test("3x Mystery Pack promotion: dates, matching lines, bonus and refunds", () => {
+  assert.equal(activePromotion("2026-10-11T18:00:00Z"), null);
+  assert.equal(activePromotion("2026-10-12T15:00:00Z").id, "mystery-packs-3x-2026-10");
+  assert.equal(activePromotion("2026-10-19T04:59:00Z").multiplier, 3); // still Sunday night Central
+  assert.equal(activePromotion("2026-10-19T05:00:00Z"), null);
+
+  const order = {
+    line_items: [
+      { id: 1, product_id: 8838001197239, price: "9.99", quantity: 5, discount_allocations: [] }, // mystery pack x5
+      { id: 2, product_id: 111, price: "20.00", quantity: 1 }, // something else
+      { id: 3, product_id: 8838732185783, price: "9.99", quantity: 1, discount_allocations: [{ amount: "1.00" }] },
+    ],
+  };
+  const ids = new Set(["8838001197239", "8838732185783", "8838906282167"]);
+  const lines = promoLines(order, ids);
+  assert.equal(lines.cents, 4995 + 899);
+  assert.deepEqual(lines.lineItemIds, ["1", "3"]);
+  // Poke Tier (2/$): base on $78.94 = 157, bonus on $58.94 at 2 extra rates (x2) = 235 -> packs earn 3x
+  assert.equal(promoBonusCoins(lines.cents, 2, 3), 235);
+  assert.equal(promoBonusCoins(lines.cents, 2, 1), 0);
+
+  const meta = { promo: "x", promoCents: lines.cents, earnableCents: 7894, extraRate: 4, lineItemIds: lines.lineItemIds };
+  // Refund the 5 packs: their $49.95 at base 2/$ + extra 4/$
+  const refund = { refund_line_items: [{ line_item_id: 1, subtotal: "49.95" }] };
+  assert.equal(promoRefundCents(refund, meta, 4995), 4995);
+  assert.equal(refundCoinsWithPromo(4995, 2, 4995, 4, 392, 0), 100 + 200);
+  // Refunding the non-promo item takes back only the base rate
+  assert.equal(promoRefundCents({ refund_line_items: [{ line_item_id: 2, subtotal: "20.00" }] }, meta, 2000), 0);
+  // Never more than the order has left
+  assert.equal(refundCoinsWithPromo(7894, 2, 5894, 4, 392, 300), 92);
+  assert.ok(PROMOTIONS.length >= 1);
+});
