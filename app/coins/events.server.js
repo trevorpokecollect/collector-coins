@@ -97,7 +97,8 @@ export async function handleCustomer(payload, { create }) {
 /**
  * Judge.me review/created: 100 coins to the reviewer for a product they bought, paid when the review is written
  * (not when staff approve it), once per product and at most MAX_REVIEW_REWARDS reviews per account.
- * Reviews Judge.me marks as spam, and reviews of products the customer hasn't bought, earn nothing.
+ * Reviews of products the customer hasn't bought earn nothing. (Judge.me's "curated" field isn't used: in this
+ * store it reads "spam" for every review until staff curate it, including genuine verified-purchase reviews.)
  * Payload shape varies by Judge.me version, so the fields are read defensively.
  */
 export async function handleReview(body) {
@@ -107,7 +108,6 @@ export async function handleReview(body) {
   const productKey = String(review.product_external_id || review.product_id || review.product_handle || "");
   if (!email || !reviewId) return { skipped: "no email or review id" };
   if (!productKey) return { skipped: "no product on the review" };
-  if (String(review.curated || "").toLowerCase() === "spam") return { skipped: "spam review" };
 
   const admin = await adminClient();
   const found = await findCustomersByEmail(admin, [email]);
@@ -116,7 +116,7 @@ export async function handleReview(body) {
   if (!customerIncluded(customer.tags)) return { skipped: "not a tester" };
 
   const shopifyProductId = review.product_external_id ? String(review.product_external_id) : null;
-  const judgemeVerified = ["buyer", "verified-buyer", "verified_buyer", "confirmed-buyer"].includes(String(review.verified || "").toLowerCase());
+  const judgemeVerified = ["buyer", "verified-buyer", "verified_buyer", "confirmed-buyer", "verified-purchase"].includes(String(review.verified || "").toLowerCase());
   const bought = shopifyProductId ? await customerBoughtProduct(admin, customer.customerId, shopifyProductId) : judgemeVerified;
   if (!bought && !judgemeVerified) return { skipped: "not a verified buyer" };
 
@@ -142,10 +142,10 @@ export async function handleReview(body) {
 export async function runReviewSweep({ days = 14, now = new Date() } = {}) {
   const token = process.env.JUDGEME_API_TOKEN;
   if (!token) return { checked: 0, paid: 0 };
-  const since = now.getTime() - days * 24 * 60 * 60 * 1000;
+  // Never before Collector Coins went live: Smile paid for reviews written before then.
+  const since = Math.max(now.getTime() - days * 24 * 60 * 60 * 1000, Date.parse(process.env.COINS_LIVE_SINCE || "2026-10-09T21:31:00Z"));
   let checked = 0, paid = 0;
   const reasons = {};
-  let sampleShape = null;
   for (let page = 1; page <= 5; page++) {
     const qs = new URLSearchParams({ api_token: token, shop_domain: process.env.SHOP || "poke-collect-al.myshopify.com", per_page: "100", page: String(page) });
     const res = await fetch(`https://judge.me/api/v1/reviews?${qs}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
@@ -155,10 +155,6 @@ export async function runReviewSweep({ days = 14, now = new Date() } = {}) {
     for (const review of reviews) {
       if (new Date(review.created_at).getTime() < since) { older = true; continue; }
       checked++;
-      if (!sampleShape) {
-        // Field names and value types only (no personal data), to check Judge.me's API matches the webhook shape.
-        sampleShape = Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v && typeof v === "object" ? Object.keys(v) : typeof v === "string" && /(curated|verified|hidden|published|source)/.test(k) ? v : typeof v]));
-      }
       const email = (review.reviewer?.email || review.email || "").trim().toLowerCase();
       const productKey = String(review.product_external_id || review.product_id || review.product_handle || "");
       if (email && productKey) {
@@ -176,7 +172,7 @@ export async function runReviewSweep({ days = 14, now = new Date() } = {}) {
     }
     if (older || reviews.length < 100) break;
   }
-  if (checked) console.log(`Review catch-up reasons: ${JSON.stringify(reasons)}; review fields: ${JSON.stringify(sampleShape)}`);
+  if (checked) console.log(`Review catch-up reasons: ${JSON.stringify(reasons)}`);
   return { checked, paid };
 }
 
