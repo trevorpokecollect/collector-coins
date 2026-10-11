@@ -144,6 +144,8 @@ export async function runReviewSweep({ days = 14, now = new Date() } = {}) {
   if (!token) return { checked: 0, paid: 0 };
   const since = now.getTime() - days * 24 * 60 * 60 * 1000;
   let checked = 0, paid = 0;
+  const reasons = {};
+  let sampleShape = null;
   for (let page = 1; page <= 5; page++) {
     const qs = new URLSearchParams({ api_token: token, shop_domain: process.env.SHOP || "poke-collect-al.myshopify.com", per_page: "100", page: String(page) });
     const res = await fetch(`https://judge.me/api/v1/reviews?${qs}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
@@ -153,18 +155,28 @@ export async function runReviewSweep({ days = 14, now = new Date() } = {}) {
     for (const review of reviews) {
       if (new Date(review.created_at).getTime() < since) { older = true; continue; }
       checked++;
+      if (!sampleShape) {
+        // Field names and value types only (no personal data), to check Judge.me's API matches the webhook shape.
+        sampleShape = Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v && typeof v === "object" ? Object.keys(v) : typeof v === "string" && /(curated|verified|hidden|published|source)/.test(k) ? v : typeof v]));
+      }
       const email = (review.reviewer?.email || review.email || "").trim().toLowerCase();
       const productKey = String(review.product_external_id || review.product_id || review.product_handle || "");
       if (email && productKey) {
         const member = await prisma.member.findFirst({ where: { email } });
-        if (member && (await prisma.transaction.findUnique({ where: { idemKey: `review-product:${member.id}:${productKey}` } }))) continue;
+        if (member && (await prisma.transaction.findUnique({ where: { idemKey: `review-product:${member.id}:${productKey}` } }))) {
+          reasons["already paid"] = (reasons["already paid"] || 0) + 1;
+          continue;
+        }
       }
       const r = await handleReview({ review }).catch((e) => ({ error: e.message }));
       if (r.coins) paid++;
+      const why = r.coins ? "paid" : r.error ? "error" : r.skipped || "unknown";
+      reasons[why] = (reasons[why] || 0) + 1;
       if (r.coins || r.error) console.log(`Review sweep ${review.id}: ${JSON.stringify(r)}`);
     }
     if (older || reviews.length < 100) break;
   }
+  if (checked) console.log(`Review catch-up reasons: ${JSON.stringify(reasons)}; review fields: ${JSON.stringify(sampleShape)}`);
   return { checked, paid };
 }
 
