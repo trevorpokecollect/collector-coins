@@ -20,7 +20,9 @@ export const loader = async ({ request }) => {
     prisma.member.count({ where: { createdAt: { gte: since30 }, importedFromSmile: false } }),
     prisma.member.aggregate({ _sum: { balance: true } }),
     prisma.member.groupBy({ by: ["tier"], _count: { _all: true } }),
-    prisma.member.count({ where: { lastActivityAt: { gte: since30 } } }),
+    prisma.$queryRaw`
+      SELECT COUNT(DISTINCT "memberId")::int AS n FROM "Transaction"
+      WHERE "createdAt" >= ${since30} AND "kind" NOT IN ('import', 'expire', 'redeem_undo')`,
     prisma.transaction.aggregate({ where: { createdAt: { gte: since30 }, amount: { gt: 0 }, kind: { notIn: ["import", "redeem_undo"] } }, _sum: { amount: true } }),
     prisma.transaction.aggregate({ where: { createdAt: { gte: since30 }, kind: "redeem" }, _sum: { amount: true } }),
     prisma.$queryRaw`
@@ -43,7 +45,7 @@ export const loader = async ({ request }) => {
   return {
     count,
     newMembers,
-    active30,
+    active30: Number(active30[0]?.n || 0),
     outstanding: sums._sum.balance || 0,
     earned30: earned30._sum.amount || 0,
     spent30: -(spent30._sum.amount || 0),

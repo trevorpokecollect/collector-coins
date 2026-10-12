@@ -248,6 +248,13 @@ function PromoSample() {
 
 // Make the real panel stylesheet render in place inside the admin page.
 const PREVIEW_CSS = `
+.ccd-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); gap: 20px; align-items: start; }
+.ccd-editor { display: grid; gap: 16px; min-width: 0; }
+.ccd-side { position: sticky; top: 12px; display: grid; gap: 12px; }
+@media (max-width: 980px) {
+  .ccd-layout { grid-template-columns: minmax(0, 1fr); }
+  .ccd-side { position: static; order: -1; }
+}
 .ccp-preview .ccp-root { position: relative !important; inset: auto !important; bottom: auto !important; right: auto !important; left: auto !important; z-index: auto !important; }
 .ccp-preview .ccp-panel { position: relative !important; display: flex !important; bottom: auto !important; width: 100% !important; max-width: 400px !important; height: 660px !important; margin: 0 auto; }
 .ccp-preview .ccp-launcher { display: none !important; }
@@ -271,8 +278,8 @@ export default function Design() {
       {result?.ok && <s-banner tone="success">{result.ok}</s-banner>}
       {result?.error && <s-banner tone="critical">{result.error}</s-banner>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 420px)", gap: 20, alignItems: "start" }}>
-        <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
+      <div className="ccd-layout">
+        <div className="ccd-editor">
           <s-section heading="Colors">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
               {Object.keys(PANEL_DEFAULTS.colors).map((k) => (
@@ -345,7 +352,7 @@ export default function Design() {
           </s-section>
         </div>
 
-        <div style={{ position: "sticky", top: 12, display: "grid", gap: 12 }}>
+        <div className="ccd-side">
           <s-section>
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
