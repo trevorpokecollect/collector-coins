@@ -4,7 +4,9 @@ import { useState } from "react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { credit, takeBack } from "../coins/ledger.server";
-import { tierByKey, nextTier, formatCoins, formatMoney, isValidBirthday, GOOGLE_REVIEW_COINS } from "../coins/rules";
+import { nextTier, formatCoins, formatMoney, isValidBirthday, GOOGLE_REVIEW_COINS } from "../coins/rules";
+import { EVENT_NAMES, labelFor } from "../coins/metrics";
+import { StatGrid, TierBadge } from "../components/ui";
 
 export const loader = async ({ request, params }) => {
   await authenticate.admin(request);
@@ -16,7 +18,12 @@ export const loader = async ({ request, params }) => {
     },
   });
   if (!member) throw new Response("Not found", { status: 404 });
-  return { member, next: nextTier(member.tier, member.lifetimeEarned) };
+  const clicks = await prisma.panelEvent.findMany({ where: { memberId: member.id }, orderBy: { createdAt: "desc" }, take: 25 });
+  return {
+    member,
+    next: nextTier(member.tier, member.lifetimeEarned),
+    clicks: clicks.map((c) => ({ id: c.id, what: `${EVENT_NAMES[c.event] || c.event}: ${labelFor(c.event, c.target)}`, path: c.path, at: c.createdAt })),
+  };
 };
 
 export const action = async ({ request, params }) => {
@@ -75,7 +82,7 @@ const selectStyle = { padding: "6px 8px", borderRadius: 8, border: "1px solid #8
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export default function MemberPage() {
-  const { member: m, next } = useLoaderData();
+  const { member: m, next, clicks } = useLoaderData();
   const result = useActionData();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
@@ -86,20 +93,29 @@ export default function MemberPage() {
 
   return (
     <s-page heading={name}>
-      <s-link slot="breadcrumb-actions" href="/app">Members</s-link>
+      <s-link slot="breadcrumb-actions" href="/app/members">Members</s-link>
       {result?.ok && <s-banner tone="success">{result.ok}</s-banner>}
       {result?.error && <s-banner tone="critical">{result.error}</s-banner>}
 
-      <s-section heading="Coins">
-        <s-paragraph>
-          <s-text type="strong">{formatCoins(m.balance)} coins</s-text> · {tierByKey(m.tier).name} ·{" "}
-          {formatCoins(m.lifetimeEarned)} lifetime{next ? ` · ${formatCoins(next.coinsToGo)} to ${next.name}` : ""}
-        </s-paragraph>
+      <s-section>
+        <s-stack gap="base">
+        <s-stack direction="inline" gap="small-200" alignItems="center">
+          <TierBadge tier={m.tier} />
+          {m.importedFromSmile ? <s-badge tone="neutral">Imported from Smile</s-badge> : null}
+        </s-stack>
+        <StatGrid
+          items={[
+            { label: "Balance", value: formatCoins(m.balance), note: "coins" },
+            { label: "Lifetime earned", value: formatCoins(m.lifetimeEarned), note: next ? `${formatCoins(next.coinsToGo)} to ${next.name}` : "Top tier" },
+            { label: "Rewards", value: m.rewards.length, note: "codes and gift cards" },
+            { label: "Last active", value: new Date(m.lastActivityAt).toLocaleDateString() },
+          ]}
+        />
         <s-paragraph>
           {m.email || "No email"} ·{" "}
           <s-link href={`shopify://admin/customers/${m.customerId}`} target="_top">Open customer</s-link>
-          {m.importedFromSmile ? " · Imported from Smile" : ""}
         </s-paragraph>
+        </s-stack>
       </s-section>
 
       <s-section heading="Adjust coins">
@@ -186,7 +202,30 @@ export default function MemberPage() {
             ))}
           </s-table-body>
         </s-table>
-        <s-paragraph><Link to="/app">Back to members</Link></s-paragraph>
+        <s-paragraph><Link to="/app/members">Back to members</Link></s-paragraph>
+      </s-section>
+
+      <s-section heading="Coin panel activity">
+        {clicks.length ? (
+          <s-table>
+            <s-table-header-row>
+              <s-table-header>What</s-table-header>
+              <s-table-header>Page</s-table-header>
+              <s-table-header>When</s-table-header>
+            </s-table-header-row>
+            <s-table-body>
+              {clicks.map((c) => (
+                <s-table-row key={c.id}>
+                  <s-table-cell>{c.what}</s-table-cell>
+                  <s-table-cell>{c.path || ""}</s-table-cell>
+                  <s-table-cell>{new Date(c.at).toLocaleString()}</s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
+          </s-table>
+        ) : (
+          <s-paragraph>No panel activity recorded yet.</s-paragraph>
+        )}
       </s-section>
     </s-page>
   );

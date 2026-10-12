@@ -50,6 +50,7 @@ model Member {
   @@index([email])
   @@index([birthdayMonth, birthdayDay])
   @@index([lastActivityAt])
+  @@index([tier])
 }
 
 // The coin ledger: every coin earned or spent is one row. balance = sum(amount).
@@ -91,4 +92,37 @@ model Reward {
 
   @@index([memberId, createdAt])
   @@index([createdAt])
+}
+
+// Storefront coin panel interactions (opens, tabs, earn and redeem clicks), for the Engagement page.
+model PanelEvent {
+  id        String   @id @default(cuid())
+  event     String   // open | tab | click | submit
+  target    String   // e.g. fab, launcher, link / earn, rewards / alerts, google, prize, join
+  memberId  String?
+  visitor   String?  // random id kept in the browser, to count unique visitors
+  path      String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([event, target, createdAt])
+  @@index([memberId, createdAt])
+}
+
+// App settings as JSON, one row per key (e.g. "panel" for the coin panel design).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Staff overrides for one prize product: a fixed coin cost and/or hiding it from the panel.
+model PrizeOverride {
+  productId String   @id // gid://shopify/Product/...
+  coins     Int?
+  hidden    Boolean  @default(false)
+  note      String?
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }

@@ -6,6 +6,7 @@
 import { runBirthdays, runReviewSweep } from "./events.server";
 import { runExpiry, checkRedemptionSpike } from "./expiry.server";
 import { monthDayInZone } from "./rules";
+import prisma from "../db.server";
 
 const HOUR = 60 * 60 * 1000;
 const state = (globalThis.__coinsJobs ||= { started: false, expiryDay: null, reviewDay: null });
@@ -35,6 +36,12 @@ async function tick() {
   }
   if (state.reviewDay !== dayKey) {
     state.reviewDay = dayKey;
+    try {
+      // Panel click history is kept for 13 months.
+      await prisma.panelEvent.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 400 * 24 * HOUR) } } });
+    } catch (e) {
+      console.error("Panel event cleanup failed", e.message);
+    }
     try {
       const r = await runReviewSweep({ now });
       if (r.checked) console.log(`Review catch-up: ${r.checked} recent reviews checked, ${r.paid} paid`);

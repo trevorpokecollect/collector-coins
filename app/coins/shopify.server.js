@@ -1,5 +1,6 @@
 // Admin API calls the coin program needs: discount codes, gift cards, customers, prize products.
 import { unauthenticated } from "../shopify.server";
+import prisma from "../db.server";
 import { PRIZE_COLLECTION_HANDLE, PRIZE_MIN_STOCK, PRIZE_TAG, prizeCoins, toCents } from "./rules";
 
 export function shopDomain() {
@@ -141,32 +142,63 @@ query Prizes($handle: String!) {
 
 let prizeCache = { at: 0, list: [] };
 
+export function clearPrizeCache() {
+  prizeCache = { at: 0, list: [] };
+}
+
 /**
- * Redeemable prizes: products in the Collector Coins Prizes collection, active, tagged, not pre-order,
- * with at least 20 tracked units in stock. Same rules as the landing page. Cached for 5 minutes.
+ * Every product in the Collector Coins Prizes collection, with stock, coin cost (staff override or price x 200)
+ * and whether it shows in the panel right now (with the reason when it doesn't).
  */
-export async function listPrizes(admin, { fresh = false } = {}) {
-  if (!fresh && Date.now() - prizeCache.at < 5 * 60 * 1000) return prizeCache.list;
-  const data = await gql(admin, PRIZES, { handle: PRIZE_COLLECTION_HANDLE });
+export async function prizeCatalog(admin) {
+  const [data, overrides] = await Promise.all([
+    gql(admin, PRIZES, { handle: PRIZE_COLLECTION_HANDLE }),
+    prisma.prizeOverride.findMany().catch(() => []),
+  ]);
+  const byId = new Map(overrides.map((o) => [o.productId, o]));
   const nodes = data.collectionByIdentifier?.products?.nodes || [];
-  const list = [];
-  for (const p of nodes) {
-    if (p.status !== "ACTIVE") continue;
-    if (!p.tags.includes(PRIZE_TAG) || p.tags.includes("Pre-Order")) continue;
+  return nodes.map((p) => {
     const variants = p.variants.nodes;
+    const tracked = variants.some((v) => v.inventoryItem?.tracked);
     const stock = variants.filter((v) => v.inventoryItem?.tracked).reduce((s, v) => s + Math.max(0, v.inventoryQuantity || 0), 0);
-    if (stock < PRIZE_MIN_STOCK) continue;
-    const priceCents = Math.max(...variants.map((v) => toCents(v.price)));
-    list.push({
+    const priceCents = variants.length ? Math.max(...variants.map((v) => toCents(v.price))) : 0;
+    const o = byId.get(p.id);
+    const defaultCoins = prizeCoins(priceCents);
+    let reason = null;
+    if (o?.hidden) reason = "Hidden by staff";
+    else if (p.status !== "ACTIVE") reason = `Product is ${p.status.toLowerCase()}`;
+    else if (!p.tags.includes(PRIZE_TAG)) reason = `Missing the "${PRIZE_TAG}" tag`;
+    else if (p.tags.includes("Pre-Order")) reason = "Pre-order";
+    else if (!tracked) reason = "Inventory not tracked";
+    else if (stock < PRIZE_MIN_STOCK) reason = `Under ${PRIZE_MIN_STOCK} in stock`;
+    return {
       productId: p.id,
       title: p.title,
+      handle: p.handle,
+      status: p.status,
       url: p.onlineStoreUrl || `/products/${p.handle}`,
       image: p.featuredMedia?.preview?.image?.url || null,
       priceCents,
-      coins: prizeCoins(priceCents),
       stock,
-    });
-  }
+      tracked,
+      defaultCoins,
+      coins: o?.coins || defaultCoins,
+      override: o ? { coins: o.coins, hidden: o.hidden, note: o.note, updatedBy: o.updatedBy, updatedAt: o.updatedAt } : null,
+      live: !reason,
+      reason,
+    };
+  });
+}
+
+/**
+ * Redeemable prizes: products in the Collector Coins Prizes collection, active, tagged, not pre-order,
+ * with at least 20 tracked units in stock and not hidden by staff. Same rules as the landing page. Cached for 5 minutes.
+ */
+export async function listPrizes(admin, { fresh = false } = {}) {
+  if (!fresh && Date.now() - prizeCache.at < 5 * 60 * 1000) return prizeCache.list;
+  const list = (await prizeCatalog(admin))
+    .filter((p) => p.live)
+    .map(({ productId, title, url, image, priceCents, coins, stock }) => ({ productId, title, url, image, priceCents, coins, stock }));
   list.sort((a, b) => a.coins - b.coins);
   prizeCache = { at: Date.now(), list };
   return list;
@@ -254,4 +286,42 @@ export async function customerBoughtProduct(admin, customerId, productId) {
   const want = numericId(productId);
   const data = await gql(admin, CUSTOMER_ORDERS, { q: `customer_id:${numericId(customerId)} AND (financial_status:paid OR financial_status:partially_refunded)` });
   return (data.orders?.nodes || []).some((o) => o.lineItems.nodes.some((li) => li.product && numericId(li.product.id) === want));
+}
+
+const REWARD_STATUS = `#graphql
+query RewardStatus($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    __typename
+    ... on GiftCard { id enabled deactivatedAt expiresOn lastCharacters balance { amount } initialValue { amount } }
+    ... on DiscountCodeNode { id codeDiscount { __typename ... on DiscountCodeBasic { status asyncUsageCount usageLimit } } }
+  }
+}`;
+
+/**
+ * Live Shopify state for reward gift cards and discount codes.
+ * Returns Map(shopifyId -> { type: "gift_card", enabled, balanceCents, initialCents, expiresOn } | { type: "code", status, used }).
+ */
+export async function rewardStatuses(admin, ids) {
+  const out = new Map();
+  const list = [...new Set(ids.filter((id) => id && id.startsWith("gid://")))];
+  for (let i = 0; i < list.length; i += 100) {
+    const data = await gql(admin, REWARD_STATUS, { ids: list.slice(i, i + 100) });
+    for (const n of data.nodes || []) {
+      if (!n) continue;
+      if (n.__typename === "GiftCard") {
+        out.set(n.id, {
+          type: "gift_card",
+          enabled: n.enabled && !n.deactivatedAt,
+          balanceCents: toCents(n.balance?.amount),
+          initialCents: toCents(n.initialValue?.amount),
+          expiresOn: n.expiresOn,
+          lastCharacters: n.lastCharacters,
+        });
+      } else if (n.__typename === "DiscountCodeNode") {
+        const d = n.codeDiscount || {};
+        out.set(n.id, { type: "code", status: d.status || null, used: d.asyncUsageCount || 0, limit: d.usageLimit || null });
+      }
+    }
+  }
+  return out;
 }

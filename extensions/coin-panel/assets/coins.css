@@ -223,4 +223,5 @@ span.ccp-ticon-lg { font-size: 24px; }
     pointer-events: none;
   }
   .ccp-fab-bal[hidden] { display: none; }
+  .ccp-fab[hidden] { display: none !important; }
 }

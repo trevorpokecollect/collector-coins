@@ -15,7 +15,12 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">Members</s-link>
+        <s-link href="/app" rel="home">Overview</s-link>
+        <s-link href="/app/members">Members</s-link>
+        <s-link href="/app/prizes">Prizes</s-link>
+        <s-link href="/app/rewards">Gift Cards &amp; Codes</s-link>
+        <s-link href="/app/engagement">Engagement</s-link>
+        <s-link href="/app/design">Panel Design</s-link>
         <s-link href="/app/import">Import from Smile</s-link>
       </s-app-nav>
       <Outlet />

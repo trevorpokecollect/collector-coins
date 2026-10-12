@@ -4,6 +4,8 @@ import { TIERS, tierByKey, nextTier, REVIEW_COINS, GOOGLE_REVIEW_COINS, ALERTS_S
 import { customerIncluded, findOrCreateMember } from "./ledger.server";
 import { adminClient, getCustomer, listPrizes } from "./shopify.server";
 import { klaviyoCanSubscribe } from "./klaviyo.server";
+import { getPanelSettings } from "./settings.server";
+import { PANEL_DEFAULTS } from "./panelSettings";
 
 // Whether text + email sign-ups can work (the Klaviyo key has the scopes), re-checked every 10 minutes.
 const alertsCheck = (globalThis.__coinsAlertsCheck ||= { at: 0, ok: false });
@@ -39,7 +41,9 @@ export async function memberForProxy(request) {
   return existing || findOrCreateMember(customer);
 }
 
-export function programInfo({ alerts = false } = {}) {
+export function programInfo({ alerts = false, settings = PANEL_DEFAULTS } = {}) {
+  const earn = settings.earn;
+  const way = (key, badge, extra = {}) => (earn[key].show ? [{ key, title: earn[key].title, badge, detail: earn[key].detail, ...extra }] : []);
   const promo = activePromotion(new Date());
   return {
     coinsPerDollarOff: COINS_PER_DOLLAR_OFF,
@@ -51,13 +55,13 @@ export function programInfo({ alerts = false } = {}) {
       key: t.key, name: t.name, threshold: t.threshold, earnRate: t.earnRate, birthdayCoins: t.birthdayCoins, reward: t.entry.title,
     })),
     alertsCoins: ALERTS_SIGNUP_COINS,
-    alertsEnabled: alerts,
+    alertsEnabled: alerts && earn.alerts.show,
     waysToEarn: [
-      ...(alerts ? [{ key: "alerts", title: "Drop & restock alerts", badge: `+${ALERTS_SIGNUP_COINS}`, detail: "Join our texts and emails to hear about new releases and restocks first." }] : []),
-      { key: "purchase", title: "Shop with us", badge: "2-10 / $1", detail: "Coins on every online order. Higher tiers earn more per $1." },
-      { key: "review", title: "Review a product", badge: `+${REVIEW_COINS}`, detail: "For each product you review." },
-      { key: "google", title: "Google review", badge: `+${GOOGLE_REVIEW_COINS}`, detail: "Email your screenshot to support@poke-collect.com", url: "https://g.page/r/CRGYfzYI9zxTEAE/review" },
-      { key: "birthday", title: "Birthday bonus", badge: "+200-500", detail: "200 coins for Ultra Tier, 500 for Master Tier." },
+      ...(alerts ? way("alerts", `+${ALERTS_SIGNUP_COINS}`) : []),
+      ...way("purchase", "2-10 / $1"),
+      ...way("review", `+${REVIEW_COINS}`),
+      ...way("google", `+${GOOGLE_REVIEW_COINS}`, { url: "https://g.page/r/CRGYfzYI9zxTEAE/review" }),
+      ...way("birthday", "+200-500"),
     ],
   };
 }
@@ -69,7 +73,8 @@ export async function panelState(member) {
   } catch (err) {
     console.error("Loading prizes failed", err);
   }
-  const state = { signedIn: Boolean(member), program: programInfo({ alerts: await alertsEnabled() }), prizes };
+  const settings = await getPanelSettings();
+  const state = { signedIn: Boolean(member), program: programInfo({ alerts: await alertsEnabled(), settings }), prizes, design: settings };
   if (!member) return state;
 
   const [rewards, activity, alerts] = await Promise.all([

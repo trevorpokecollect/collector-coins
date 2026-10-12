@@ -8,6 +8,7 @@
   endif
 -%}
 {%- if show -%}
+  <script type="application/json" id="ccp-config">{{ app.metafields.collector_coins.panel.value | json }}</script>
   <div
     id="ccp-root"
     class="ccp-root ccp-pos-{{ block.settings.position }}"
