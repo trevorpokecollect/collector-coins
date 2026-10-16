@@ -444,9 +444,12 @@
   function avoidOverlap() {
     if (root.classList.contains("ccp-open") || !launcher || launcher.offsetParent === null) return;
     if (baseBottom === null) baseBottom = parseFloat(getComputedStyle(root).bottom) || 20;
+    // Measure where the button would sit at its normal height without moving it there first:
+    // dropping it and lifting it back on every check counted as layout shift (CLS).
     var prev = root.style.bottom;
-    root.style.bottom = baseBottom + "px";
-    var r = launcher.getBoundingClientRect();
+    var dy = (parseFloat(getComputedStyle(root).bottom) || baseBottom) - baseBottom;
+    var b = launcher.getBoundingClientRect();
+    var r = { left: b.left, right: b.right, top: b.top + dy, bottom: b.bottom + dy, width: b.width, height: b.height };
     var points = [[r.left + 4, r.top + 4], [r.right - 4, r.top + 4], [r.left + 4, r.bottom - 4], [r.right - 4, r.bottom - 4], [r.left + r.width / 2, r.top + r.height / 2]];
     var vh = window.innerHeight, lift = 0, covered = false;
     points.forEach(function (pt) {
@@ -461,7 +464,7 @@
     });
     root.classList.toggle("ccp-tucked", covered);
     var next = !covered && lift ? Math.round(lift + 12) + "px" : baseBottom + "px";
-    if (next !== prev) root.style.bottom = next; else root.style.bottom = prev;
+    if (next !== prev) root.style.bottom = next;
   }
   var avoidTimer;
   function scheduleAvoid() { clearTimeout(avoidTimer); avoidTimer = setTimeout(avoidOverlap, 120); }
