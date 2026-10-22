@@ -224,10 +224,15 @@
     );
   }
 
+  // Five gold stars beside the review titles, so customers see a 5-star review is what we're hoping for.
+  var STAR = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9L12 2.5z"/></svg>';
+  var STARS = '<span class="ccp-stars" role="img" aria-label="5 stars">' + STAR + STAR + STAR + STAR + STAR + "</span>";
+
   function earnList(p) {
     return p.waysToEarn.map(function (w) {
+      var stars = w.key === "review" || w.key === "google" ? STARS : "";
       var link = w.url ? ' <a href="' + esc(w.url) + '" target="_blank" rel="noopener" data-track="' + esc(w.key) + '">Write a review</a>' : "";
-      return '<div class="ccp-card ccp-earn">' + icon(w.key) + '<div class="ccp-grow"><div class="ccp-t">' + esc(w.title) + '</div><div class="ccp-d">' + esc(w.detail) + link + "</div></div>" +
+      return '<div class="ccp-card ccp-earn">' + icon(w.key) + '<div class="ccp-grow"><div class="ccp-t">' + esc(w.title) + stars + '</div><div class="ccp-d">' + esc(w.detail) + link + "</div></div>" +
         (w.badge ? '<span class="ccp-pill">' + esc(w.badge) + "</span>" : "") + "</div>";
     }).join("");
   }

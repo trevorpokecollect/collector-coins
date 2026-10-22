@@ -95,6 +95,8 @@ a.ccp-t:hover { color: var(--ccp-red); }
 
 /* Ways to earn */
 .ccp-earn { border-left: 6px solid var(--ccp-red); }
+.ccp-stars { display: inline-flex; gap: 1px; margin-left: 6px; vertical-align: -2px; white-space: nowrap; }
+.ccp-stars svg { fill: #ffc107; stroke: #c98a00; stroke-width: 1; }
 .ccp-ico { flex: none; width: 42px; height: 42px; border-radius: 12px; background: var(--ccp-dark); color: var(--ccp-yellow); display: grid; place-items: center; }
 .ccp-pill { flex: none; background: var(--ccp-yellow); color: var(--ccp-dark); font: 700 14px/1 var(--ccp-display); padding: 7px 10px; border-radius: 999px; letter-spacing: .02em; white-space: nowrap; }
 .ccp-earn-col { flex-direction: column; align-items: stretch; }
