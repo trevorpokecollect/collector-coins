@@ -197,3 +197,14 @@ test("US phone numbers for text alerts", () => {
   assert.equal(normalizeUsPhone("44 7700 900123"), null);
   assert.equal(ALERTS_SIGNUP_COINS, 200);
 });
+
+test("Black Friday 2x promotion: dates and all-items bonus", () => {
+  assert.equal(activePromotion("2026-11-27T05:59:00Z"), null); // Thu 11:59 PM Central
+  const p = activePromotion("2026-11-27T06:00:00Z");
+  assert.equal(p.id, "black-friday-2x-2026-11");
+  assert.equal(p.allProducts, true);
+  assert.equal(activePromotion("2026-12-01T05:59:00Z").multiplier, 2); // Mon 11:59 PM Central
+  assert.equal(activePromotion("2026-12-01T06:00:00Z"), null);
+  // 2x = one extra rate: $50 at Great Tier (3/$1) earns 150 base + 150 bonus
+  assert.equal(promoBonusCoins(5000, 3, 2), 150);
+});

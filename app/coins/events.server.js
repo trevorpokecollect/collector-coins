@@ -48,10 +48,13 @@ export async function handleOrderPaid(order) {
   // Coin promotion (e.g. 3x on Mystery Packs) for orders placed while it runs.
   const promo = activePromotion(order.processed_at || order.created_at || new Date());
   if (promo) {
-    const ids = await productIdsOfType(await adminClient(), promo.productType).catch((e) => {
-      console.error(`Promotion ${promo.id}: product lookup failed`, e.message);
-      return new Set();
-    });
+    // allProducts: every item in the order counts (e.g. Black Friday 2x on everything).
+    const ids = promo.allProducts
+      ? new Set((order.line_items || []).map((li) => String(li.product_id)))
+      : await productIdsOfType(await adminClient(), promo.productType).catch((e) => {
+          console.error(`Promotion ${promo.id}: product lookup failed`, e.message);
+          return new Set();
+        });
     const lines = promoLines(order, ids);
     const cents = Math.min(lines.cents, subtotalCents);
     const bonus = promoBonusCoins(cents, rate, promo.multiplier);
