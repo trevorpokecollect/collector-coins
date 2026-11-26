@@ -214,6 +214,18 @@ export const PROMOTIONS = [
     endsText: "Ends Sunday, October 18",
     url: "/collections/digital-mystery-packs",
   },
+  {
+    id: "black-friday-2x-2026-11",
+    title: "Black Friday 2x Coins",
+    allProducts: true, // every item, every tier
+    multiplier: 2,
+    startsAt: "2026-11-27T06:00:00Z", // Fri Nov 27, 12:00 AM Central
+    endsAt: "2026-12-01T06:00:00Z", // end of Monday Nov 30, Central
+    headline: "Double Coins All Weekend",
+    blurb: "Every order earns 2x Collector Coins, on every tier.",
+    endsText: "Ends Monday, November 30",
+    url: "/collections/all",
+  },
 ];
 
 export function activePromotion(at, promotions = PROMOTIONS) {
