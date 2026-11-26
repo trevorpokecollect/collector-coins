@@ -224,7 +224,7 @@ export const PROMOTIONS = [
     headline: "Double Coins All Weekend",
     blurb: "Every order earns 2x Collector Coins, on every tier.",
     endsText: "Ends Monday, November 30",
-    url: "/collections/all",
+    url: "/collections/fresh-restocks",
   },
 ];
 
