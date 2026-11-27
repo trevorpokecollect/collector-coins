@@ -154,9 +154,9 @@ function Preview({ s, signedIn, badges, tiers }) {
                 <div className="ccp-tierline">
                   <span className="ccp-ticon ccp-tb-great">G</span>
                   <div>
-                    <b>Great Tier</b> · 3 coins per $1
+                    <b>Collector Tier</b> · 3 coins per $1
                     <br />
-                    <span>2,750 coins to Ultra Tier</span>
+                    <span>2,750 coins to Pro Tier</span>
                   </div>
                 </div>
                 <div className="ccp-bar">

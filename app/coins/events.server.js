@@ -203,7 +203,7 @@ export async function runReviewSweep({ days = 14, now = new Date() } = {}) {
   return { checked, paid };
 }
 
-/** Daily: birthday coins for Ultra and Master Ball members, once a year. */
+/** Daily: birthday coins for Pro and Legend Tier members, once a year. */
 export async function runBirthdays(now = new Date()) {
   const today = monthDayInZone(now);
   const leap = (today.year % 4 === 0 && today.year % 100 !== 0) || today.year % 400 === 0;

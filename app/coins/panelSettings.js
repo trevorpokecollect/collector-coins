@@ -34,7 +34,7 @@ export const PANEL_DEFAULTS = {
     purchase: { show: true, title: "Shop with us", detail: "Coins on every online order. Higher tiers earn more per $1." },
     review: { show: true, title: "Review a product", detail: "For each product you review." },
     google: { show: true, title: "Google review", detail: "Email your screenshot to support@poke-collect.com" },
-    birthday: { show: true, title: "Birthday bonus", detail: "200 coins for Ultra Tier, 500 for Master Tier." },
+    birthday: { show: true, title: "Birthday bonus", detail: "200 coins for Pro Tier, 500 for Legend Tier." },
   },
   sections: {
     promo: true, // coin promotion banner

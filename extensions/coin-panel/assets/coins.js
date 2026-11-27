@@ -251,7 +251,7 @@
   function homeView(m) {
     var b = m.birthday
       ? '<div class="ccp-card ccp-earn">' + icon("birthday") + '<div class="ccp-grow"><div class="ccp-t">Your birthday</div><div class="ccp-d">Saved: ' + MONTHS[m.birthday.month - 1] + " " + m.birthday.day + "</div></div></div>"
-      : '<div class="ccp-card ccp-earn ccp-earn-col"><div class="ccp-earn-top">' + icon("birthday") + '<div class="ccp-grow"><div class="ccp-t">Add your birthday</div><div class="ccp-d">Ultra and Master Tier members get birthday coins.</div></div></div>' +
+      : '<div class="ccp-card ccp-earn ccp-earn-col"><div class="ccp-earn-top">' + icon("birthday") + '<div class="ccp-grow"><div class="ccp-t">Add your birthday</div><div class="ccp-d">Pro and Legend Tier members get birthday coins.</div></div></div>' +
         '<div class="ccp-bday"><select data-bday="month" aria-label="Month">' + MONTHS.map(function (x, i) { return '<option value="' + (i + 1) + '">' + x + "</option>"; }).join("") +
         '</select><select data-bday="day" aria-label="Day">' + Array.from({ length: 31 }, function (_, i) { return '<option value="' + (i + 1) + '">' + (i + 1) + "</option>"; }).join("") +
         '</select><button type="button" class="ccp-btn" data-act="birthday">Save</button></div></div>';
